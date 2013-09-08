@@ -1,0 +1,148 @@
+\documentclass[times]{article} % For aTeX2e
+\usepackage{nips12submit_e}
+\usepackage[numbers]{natbib}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{subfigure}
+
+\input{../definitions}
+\input{../notationDef}
+
+\newcommand{\noti}{{\backslash i}}
+\renewcommand{\d}{\,\text d}
+
+
+\global\long\def\pseudotargetScalar{\tilde y}
+
+\begin{document}
+\section{The Cavity distribution}
+The cavity distribution is defined as
+$$
+c(\mappingFunctionVector_i) \propto \int p(\mappingFunctionVector) \prod_{j\neq i}t(\mappingFunctionVector_i, \tilde \mu_i, \tilde \sigma^2_i)
+$$
+
+We'll treat these approximate likelihoods as {\em pseudo data}. We'll envisage a series of independent normal variables so that
+$$
+p(\pseudotargetVector_i | \mappingFunctionVector_i) = \mathcal N(\pseudotargetVector_i | \mappingFunctionVector_i, \beta_i^{-1})
+$$
+The cavity distribution can then be seen as the following conditional density:
+$$
+c(\mappingFunctionVector_i) = \frac{\int p(\mappingFunctionVector)p(\pseudotargetVector_\noti|\mappingFunctionVector_\noti) \d {\mappingFunctionVector_\noti}}{\int p(\mappingFunctionVector)p(\pseudotargetVector_\noti|\mappingFunctionVector_\noti) \d {\mappingFunctionVector}}
+= \frac{p(\mappingFunctionVector_i , \pseudotargetVector_\noti)}{p(\pseudotargetVector_\noti)}
+= p(\mappingFunctionVector_i | \pseudotargetVector_\noti)
+$$
+
+To optimise our approximation, we'll optimise the parameters $\pseudotargetVector, \boldsymbol \beta$. 
+
+\section{The variational distribution}
+Let's define an factorising distribution $q(\mappingFunctionVector)$. 
+$$
+q(\mappingFunctionVector) = \prod_i q_i(\mappingFunctionVector_i) = 
+\prod_i \frac{p(\dataVector_i|\mappingFunctionVector_i)c(\mappingFunctionVector_i)}{\int p(\dataVector_i|\mappingFunctionVector_i)c(\mappingFunctionVector_i) \d \mappingFunctionVector_i}
+= \prod_i \frac{p(\dataVector_i|\mappingFunctionVector_i)p(\mappingFunctionVector_i|\pseudotargetVector_\noti)}{\int p(\dataVector_i|\mappingFunctionVector_i)p(\mappingFunctionVector_i|\pseudotargetVector_\noti) \d \mappingFunctionVector_i}
+ = \prod_i p(\mappingFunctionVector_i | \dataVector_i, \pseudotargetVector_\noti)
+$$
+this is clearly just the marginal posterior for $\mappingFunctionVector_i$, conditioned on the other pseudotargets, and the $i^\text{th}$ datum $\dataVector_i$. In EP, moments of this distribution are used\ldots
+\section{EP}
+EP proceeds by minimising the following KL divergence:
+$$
+\textsc{KL}[p(\mappingFunctionVector_i|\dataVector_i,\pseudotargetVector_\noti)|| p(\mappingFunctionVector_i | \pseudotargetVector)]
+$$
+this is done by setting the variables $\pseudotargetVector_i, \beta_i$ so that the moments of $p(\mappingFunctionVector_i|\pseudotargetVector)$ match those of $p(\mappingFunctionVector_i|\dataVector_i,\pseudotargetVector_\noti)$
+nobody seems to know what objective this is minimising, and it doesn't seem to be understood as a variational method. 
+
+\section{A Variational Bound}
+Here's Bayes' rule with the usual positions of the marginal and posterior swapped:
+$$
+\log p(\dataVector) = \log \frac{p(\dataVector|\mappingFunctionVector)p(\mappingFunctionVector)}{p(\mappingFunctionVector|\dataVector)}
+$$
+Introduce $p(\pseudotargetVector | \mappingFunctionVector)$ and $q(\mappingFunctionVector)$:
+$$
+\log p(\dataVector) = \log \frac{p(\dataVector|\mappingFunctionVector)}{p(\pseudotargetVector|\mappingFunctionVector)} + \log \frac{p(\pseudotargetVector|\mappingFunctionVector)p(\mappingFunctionVector)}{q(\mappingFunctionVector)} + \log \frac{q(\mappingFunctionVector)}{p(\mappingFunctionVector|\dataVector)}
+$$
+and now take the expectation under $q(\mappingFunctionVector)$ to give a variational bound (note that the lhs remains the same):
+\begin{equation}
+	\log p(\dataVector) = \bbE_{q(\mappingFunctionVector)}\left[\log \frac{p(\dataVector|\mappingFunctionVector)}{p(\pseudotargetVector|\mappingFunctionVector)}\right] +\bbE_{q(\mappingFunctionVector)}\left[\ \log \frac{p(\pseudotargetVector|\mappingFunctionVector)p(\mappingFunctionVector)}{q(\mappingFunctionVector)}\right] + \textsc{KL}[q(\mappingFunctionVector)||p(\mappingFunctionVector|\dataVector)]
+\end{equation}
+
+This standard variational technique gives a natural approximation algorithm: by maximising the first two terms, we naturally minimise the KL divergence between the approximation $q$ and the posterior. Unconventionally, the variational distribution is tied up in the pseudotargets. How can we make sense of this objective, and how can it be maximised?
+
+Let's take the first term first. We'll assume that the likelihood in the nominator factorises, and we've defined the denominator in a similar fashion. This means we can write the whole thing as a sum:
+$$
+\bbE_{q(\mappingFunctionVector)}\left[\log \frac{p(\dataVector|\mappingFunctionVector)}{p(\pseudotargetVector|\mappingFunctionVector)}\right]  = \sum_i \bbE_{q(\mappingFunctionVector_i)} \left[\log \frac{p(\dataVector_i|\mappingFunctionVector_i)}{p(\pseudotargetVector_i| \mappingFunctionVector_i)}\right]
+$$
+
+Now multiply top and bottom of the fraction by $p(\mappingFunctionVector_i|\pseudotargetVector_\noti)$, and normalise. 
+$$
+\bbE_{q(\mappingFunctionVector)}\left[\log \frac{p(\dataVector|\mappingFunctionVector)}{p(\pseudotargetVector|\mappingFunctionVector)}\right]  = \sum_i \bbE_{q(\mappingFunctionVector_i)} \left[\log \frac{q(\mappingFunctionVector_i)}{p(\mappingFunctionVector_i| \pseudotargetVector)}\right] + \log\frac{p(\dataVector_i|\pseudotargetVector_\noti)}{p(\pseudotargetVector_i|\pseudotargetVector_\noti)}
+$$
+
+Okay, that's now a sum of KL divergences, plus some constants. EP proceeds by minimising these one at a time, and this procedure is intuitive: we'll consecutively make the marginals of the EP approximation ($p(\mappingFunctionVector_i| \pseudotargetVector)$) closer to the variational approximation.
+
+Since the KL divergences are all positive, we can write a bound on the marginal likelihood by removing them from the expression, as well as the KL divergence between the variational distribution $q$ and the posterior. We have 
+\begin{equation}
+	\log p(y) \geq  \bbE_{q(\mappingFunctionVector)}\left[\ \log \frac{p(\pseudotargetVector|\mappingFunctionVector)p(\mappingFunctionVector)}{q(\mappingFunctionVector)}\right] +\sum_i \log\frac{p(\dataVector_i|\pseudotargetVector_\noti)}{p(\pseudotargetVector_i|\pseudotargetVector_\noti)}
+\end{equation}
+and maximising this expression minimises the KL divergence from the variational distribution to the posterior, and from the marginals of the EP approximation ($p(\mappingFunctionVector_i|\pseudotargetVector)$) to the variational distribution. 
+
+\section{Iterative procedures}
+Now, does the EP method really optimise this bound? We'll split out one of the terms (the $i^\text{th}$): write $p(\mappingFunctionVector)$ as $p(\mappingFunctionVector_i|\mappingFunctionVector_\noti) p(\mappingFunctionVector_\noti)$, and remember that both our approximation $q$ and the pseudotargets factorize. 
+
+\begin{equation}
+\begin{split}
+	\bbE_{q(\mappingFunctionVector)}\left[\ \log \frac{p(\pseudotargetVector|\mappingFunctionVector)p(\mappingFunctionVector)}{q(\mappingFunctionVector)}\right]  &= \bbE_{q(\mappingFunctionVector_i)q(\mappingFunctionVector_\noti)} \left[\log \frac{p(\pseudotargetVector_i|\mappingFunctionVector_i)p(\pseudotargetVector_\noti|\mappingFunctionVector_\noti)p(\mappingFunctionVector_i|\mappingFunctionVector_\noti)p(\mappingFunctionVector_\noti)}{q(\mappingFunctionVector_i)q(\mappingFunctionVector_\noti)}\right]\\
+&= \bbE_{q(\mappingFunctionVector)} \left[\log \frac{p(\pseudotargetVector_i|\mappingFunctionVector_i)p(\mappingFunctionVector_i|\mappingFunctionVector_\noti)}{q(\mappingFunctionVector_i)}\right] + \bbE_{q(\mappingFunctionVector_\noti)}\left[\log \frac{p(\pseudotargetVector_\noti|\mappingFunctionVector_\noti)p(\mappingFunctionVector_\noti)}{q(\mappingFunctionVector_\noti)}\right]
+\end{split}
+\end{equation}
+We've managed to split out the $i^\text{th}$ factor into the first term, which looks like an un-normalised KL divergence. We could go ahead and start minimising that term, but that wouldn't be EP (will come back to that idea later). We need the top of this to contain the cavity distribution. Some manipulation of the cavity distribution reveals that
+$$
+\log p(\mappingFunctionVector_i | \mappingFunctionVector_\noti) = \log p(\mappingFunctionVector_i | \pseudotargetVector_\noti) + \log \frac{p(\mappingFunctionVector_\noti, \pseudotargetVector_\noti | \mappingFunctionVector_i)}{p(\pseudotargetVector_\noti | \mappingFunctionVector_\noti)p(\mappingFunctionVector_\noti)}
+$$ 
+We can substitute this into the above to get (some terms cancel):
+
+\begin{equation}
+	\begin{split}
+&= \bbE_{q(\mappingFunctionVector_i)} \left[\log \frac{p(\pseudotargetVector_i|\mappingFunctionVector_i)p(\mappingFunctionVector_i|\pseudotargetVector_\noti)}{q(\mappingFunctionVector_i)}\right] + \bbE_{q(\mappingFunctionVector)}\left[\log \frac{p(\mappingFunctionVector_\noti, \pseudotargetVector_\noti|\mappingFunctionVector_i)}{q(\mappingFunctionVector_\noti)}\right]\\
+&= -\textsc{KL}[p(\mappingFunctionVector_i|\pseudotargetVector) || q(\mappingFunctionVector_i)]  + \log p(\pseudotargetVector_i|\pseudotargetVector_\noti) + \bbE_{q(\mappingFunctionVector)}\left[\log \frac{p(\mappingFunctionVector_\noti, \pseudotargetVector_\noti|\mappingFunctionVector_i)}{q(\mappingFunctionVector_\noti)}\right]
+	\end{split}
+\end{equation}
+
+So minimising this $\textsc{KL}$  wrt $\pseudotargetVector_i, \beta_i$ appears to maximise our bound. But does it? The term on the right is also affected by these variables! This happens in two ways: first, the nominator is conditioned on $\mappingFunctionVector_i$; second, $q(\mappingFunctionVector_\noti)$ are dependent on $\pseudotargetVector_i, \beta_i$. 
+
+The first of these can only be resolved by making $p(\mappingFunctionVector_\noti|\mappingFunctionVector_i) = p(\mappingFunctionVector_\noti)$, i.e making the $i^\text{th}$ point independent. This leads to a rather uninteresting Gaussian Process, so is impracticable.  
+
+The second can be more easily avoided by not changing the $q(\mappingFunctionVector_\noti)$ when we change $\pseudotargetVector_i, \beta_i$, leaving each of the $q$s dependent on {\em old} values of $\pseudotargetVector, \boldsymbol \beta$ until we update them. We'll need this minor trick in our variational method\ldots
+
+\section{A convergent variational method. }
+How about just taking the bound and optimising it by gradient methods? We'll need some properties of the sigmoid-Gaussian distribution.
+
+\section{The sigmoid-Gaussian}
+Let's define a distribution for $x$ which is made by multiplying a Gaussian by a sigmoid. (We'll use $x$ instead of $\mappingFunctionVector_i)$ here for simplicity. 
+$$q(x) = \phi(x)\mathcal N(x | m, s)/z,$$
+with z defined as 
+$$z = \int \phi(x)\mathcal N(x | m, s) \d x$$
+
+Some properties of this distribution are given by \cite{rasmussen2006gaussian}, namely
+\begin{equation*}
+	\begin{split}
+		z &= \phi(m')\\
+		\bbE_q[x] &= m + \frac{s \mathcal N(m')}{\phi(m')\sqrt{1+s}}\\
+		\bbE_q[x^2] &= 2m\bbE_q[x] - m^2 + s - \frac{s^2 m' \mathcal N(m')}{\phi(m')(1+s)}\\
+		\bbE_q[(x-\bbE_q[x])^2] &= s - \frac{s^2 m' \mathcal N(m')}{\phi(m')(1+s)}(m' + \frac{\mathcal N(m')}{\phi(m')})
+	\end{split}
+\end{equation*}
+with $m' = \frac{m}{\sqrt{1+s}}$. We also need the entropy, and the derivative of the entropy wrt $m,s$. unfortunately, the entropy turns out to be intractable
+
+
+
+
+
+
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 

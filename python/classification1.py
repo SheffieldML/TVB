@@ -78,7 +78,7 @@ class classification(GPy.core.Model):
 
         #watch the broadcast!
         dcav_vars_dbeta = -(self.Sigma**2 / self.diag_Sigma**2 - np.eye(self.num_data) )*self.cavity_vars**2
-        dcav_means_dbeta = np.eye(self.num_data)#TODO
+        dcav_means_dbeta = (self.Ytilde[:, None] - self.cavity_means) * self.Sigma  # np.eye(self.num_data)#TODO
         #dcav_vars_dYtilde = 0
         dcav_means_dYtilde = (self.Sigma*self.beta[:,None]/self.diag_Sigma - np.diag(self.beta))*self.cavity_vars
 
@@ -106,7 +106,7 @@ class classification(GPy.core.Model):
 
 
 if __name__=='__main__':
-    N = 2
+    N = 50
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.where(X>0.5,1,0).flatten()

@@ -40,10 +40,6 @@ class classification(GPy.core.Model):
         self.q_means = np.array([q.mean() for q in self.truncnorms])
         self.q_vars = np.array([q.var() for q in self.truncnorms])
 
-    def hack(self):
-        self.cavity_means = self.Ytilde
-        self.truncnorms = [truncnorm(mu, var, ('left' if y==1 else 'right')) for mu, var, y in zip(self.cavity_means, self.cavity_vars, self.Y.flatten())]
-
 
     def _get_params(self):
         return np.hstack((self.Ytilde, self.beta, self.kern._get_params_transformed()))
@@ -86,14 +82,15 @@ class classification(GPy.core.Model):
         #dcav_vars_dYtilde = 0
         dcav_means_dYtilde = (self.Sigma*self.beta[:,None]/self.diag_Sigma - np.diag(self.beta))*self.cavity_vars
 
-        dB_dbeta = np.dot(dB_dcav_means, dcav_means_dbeta) + np.dot(dB_dcav_vars, dcav_vars_dbeta)
-        dB_dYtilde = np.dot(dB_dcav_means, dcav_means_dYtilde)
+        dB_dbeta = np.dot(dcav_means_dbeta, dB_dcav_means) + np.dot(dcav_vars_dbeta, dB_dcav_vars)
+        dB_dYtilde = np.dot(dcav_means_dYtilde, dB_dcav_means)
 
 
         #C TODO
         dC_dYtilde = 0
         dC_dbeta = 0
 
+        #sum gradients from all the different parts
         dL_dbeta = dA_dbeta + dB_dbeta + dC_dbeta
         dL_dYtilde = dA_dYtilde + dB_dYtilde + dC_dYtilde
 
@@ -109,7 +106,8 @@ class classification(GPy.core.Model):
 
 
 if __name__=='__main__':
-    X = np.random.rand(6)[:,None]
+    N = 2
+    X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.where(X>0.5,1,0).flatten()
     m = classification(X,Y,GPy.kern.rbf(1,1,0.2) + GPy.kern.white(1,1e-1))

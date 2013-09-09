@@ -2,6 +2,9 @@ import numpy as np
 import pylab as pb
 from scipy.stats import norm as scipynorm
 from scipy import special
+from GPy.models.gradient_checker import GradientChecker
+import itertools
+from GPy.core.model import Model
 pb.ion()
 # pb.close('all')
 
@@ -45,7 +48,7 @@ class truncnorm:
         pb.title('H=%f'%self.H_sample())
 
     def plot_dH_ds(self, mean=0):
-        self.mu = mean
+        # self.mu = mean
         x = np.linspace(1E-2,5,1000)
         def h(s):
             self.sigma = np.sqrt(s)
@@ -64,11 +67,11 @@ class truncnorm:
             return self.dmean_dvar()
         H = np.vectorize(h)
         dH = np.vectorize(dh)
-        MV = np.vectorize(dmean_dvar)
-        for m in range(-10,10,2):
-            self.mu = m
+        # MV = np.vectorize(dmean_dvar)
+        for m in range(1):
+#             self.mu = m
             self.compute_Z()
-            pb.figure('mean:'+str(m))
+            pb.figure("mu:{:.4f} var:{:.4f} side:{:s}".format(self.mu, self.sigma, self.side))
             pb.clf()
             pb.plot(x,dH(x), label='dH', lw=1.5)
             #pb.plot(x,MV(x), label='dMV', lw=1.5)
@@ -107,16 +110,30 @@ class truncnorm:
         return H
 
     def dmean_dmu(self):
-        N = scipynorm.pdf(self.mu/self.sigma)
-        return  1 - (N/self.Z)**2 - self.mu*N/self.Z/self.sigma# this is right!
+        a = self.mu / self.sigma
+        N = scipynorm.pdf(a)
+        if self.side == 'right':
+            a = -a
+        dmean_dmu_partial = (N / self.Z) ** 2 + a * N / self.Z
+        return 1 - dmean_dmu_partial  # this is right!
 
     def dvar_dmu(self):
-        N = scipynorm.pdf(self.mu/self.sigma)
-        return  -self.sigma*N/self.Z + self.mu**2*N/self.Z/self.sigma + 3*self.mu*N**2/self.Z**2 + 2*self.sigma*(N/self.Z)**3
+        mu = self.mu, sigma
+        N = scipynorm.pdf(self.mu / self.sigma)
+        if self.side == 'right':
+            mu = -mu
+            return self.sigma * N / self.Z - mu ** 2 * N / self.Z / self.sigma - 3 * mu * N ** 2 / self.Z ** 2 - 2 * self.sigma * (N / self.Z) ** 3
+        # left:
+        return -self.sigma * N / self.Z + mu ** 2 * N / self.Z / self.sigma + 3 * mu * N ** 2 / self.Z ** 2 + 2 * self.sigma * (N / self.Z) ** 3
 
     def dH_dmu(self):
-        N = scipynorm.pdf(self.mu/self.sigma)
-        return (0.5/self.sigma2)*(N/self.Z*(self.sigma + self.mu**2/self.sigma) + self.mu*N**2/self.Z**2)
+        mu = self.mu
+        N = scipynorm.pdf(mu / self.sigma)
+        if self.side == 'right':
+            mu = -mu
+            return -((0.5 / self.sigma2) * (N / self.Z * (self.sigma + mu ** 2 / self.sigma) + mu * N ** 2 / self.Z ** 2))
+        # left:
+        return (0.5 / self.sigma2) * (N / self.Z * (self.sigma + mu ** 2 / self.sigma) + mu * N ** 2 / self.Z ** 2)
 
     def dmean_dvar(self):
         a = self.mu/self.sigma
@@ -124,10 +141,11 @@ class truncnorm:
         N_Z = N/self.Z
         if self.side == 'right':
             a = -a
-        dmean_dvar = N_Z * 1./(2*self.sigma) * (1 + a * (a + N_Z))
+        half_sigma_inv = 1./(2.*self.sigma)
+        dmean_dvar = N_Z * half_sigma_inv * (1 + a * (a + N_Z))
         if self.side == 'right':
             dmean_dvar = -dmean_dvar
-        return dmean_dvar #N_Z*(np.square(self.mu/self.sigma) + 1 + N_Z*self.mu/self.sigma)/2/self.sigma # Okay!
+        return dmean_dvar  # N_Z * (np.square(self.mu / self.sigma) + 1 + N_Z * self.mu / self.sigma) / 2 / self.sigma  # Okay!
 
     def dvar_dvar(self):
         """ The derivative of the truncated variance wrt the Gaussian variance..."""
@@ -155,7 +173,31 @@ class truncnorm:
                 - 0.5/(sigma**4) * (mu**2 + self.var() + Ex**2 - 2*Ex*mu)
                 )
 
+class TestTruncnorm(Model, truncnorm):
+    def __init__(self, mu, sigma2, side):
+        self.mu, self.sigma2, self.side = mu, sigma2, side
+        self.sigma = np.sqrt(self.sigma2)
+        self.compute_Z()
+        super(TestTruncnorm, self).__init__()
+    def _get_param_names(self):
+        return ['mu', 'var']
+    def _set_params(self, x):
+        self.mu = float(x[0])
+        self.sigma = float(x[1])
+        self.sigma2 = np.square(self.sigma)
+        # self.sigma = np.sqrt(self.sigma2)
+        self.compute_Z()
+    def _get_params(self):
+        self.compute_Z()
+        return np.array([self.mu, self.sigma])
+    def log_likelihood(self):
+        self.compute_Z()
+        return self.H()
+    def _log_likelihood_gradients(self):
+        self.compute_Z()
+        # return np.array([self.dH_dmu(), self.dH_dvar()])
+        return np.array([self.dH_dmu(), self.dH_dvar() * 2 * self.sigma])
 if __name__ == '__main__':
-    t = truncnorm(0, 3, side='left')
-    #t.plot()
-    #t.plot_dH_ds()
+    mu, sigma = np.random.randn(), np.random.rand()
+    t_left = TestTruncnorm(mu, sigma, 'left')
+    t_right = TestTruncnorm(mu, sigma, 'right')

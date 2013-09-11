@@ -68,16 +68,19 @@ class classification(GPy.core.Model):
         return B
 
     def _log_likelihood_gradients(self):
-        # first compute gradients wrt cavity means/vars, then chain
-        dq_dcav_means = np.array([q.dH_dmu() for q in self.truncnorms])
-        dq_dcav_vars = np.array([q.dH_dvar() for q in self.truncnorms])
-
         #A TODO
         dA_dYtilde = 0  # self.beta * (self.Ytilde - self.q_means)
         dA_dbeta = 0
 
         #B
+        #first compute gradients wrt cavity means/vars, then chain
+        dB_dcav_means = np.array([q.dH_dmu() for q in self.truncnorms])
+        dB_dcav_vars = np.array([q.dH_dvar() for q in self.truncnorms])
+
+		#partial derivatives: watch the broadcast!
         #watch the broadcast!
+		dcav_means_dbeta_old = (self.Ytilde[:, None] - self.cavity_means) * self.Sigma
+        #dcav_vars_dYtilde = 0
         dcav_vars_dbeta = -(self.Sigma**2 / self.diag_Sigma**2 - np.eye(self.num_data) )*self.cavity_vars**2
         dcav_means_dbeta_l = dcav_vars_dbeta * (self.mu / self.diag_Sigma - self.Ytilde * self.beta)
         dmu_dbeta = (self.Ytilde[:, None] - self.cavity_means) * self.Sigma  # np.eye(self.num_data)#TODO
@@ -88,21 +91,22 @@ class classification(GPy.core.Model):
         dcav_means_dbeta += self.cavity_vars * self.Sigma / self.diag_Sigma * (self.Ytilde[:, None] - self.mu[:, None])
         dcav_means_dbeta += self.mu * self.cavity_vars * (self.Sigma / self.diag_Sigma) ** 2
         dcav_means_dbeta -= self.cavity_means * self.Ytilde * np.eye(self.beta.shape[0])
-
+	
         #dcav_vars_dYtilde = 0
         dcav_means_dYtilde = (self.Sigma * self.beta[:, None] / self.diag_Sigma - np.diag(self.beta)) * self.cavity_vars
 
         dB_dbeta = np.dot(dcav_means_dbeta, dq_dcav_means) + np.dot(dcav_vars_dbeta, dq_dcav_vars)
         dB_dYtilde = np.dot(dcav_means_dYtilde, dq_dcav_means)
 
-
-        #C TODO
-        dC_dYtilde = 0
-        dC_dbeta = 0
+        #C
+        dC_dcav_means = np.array([q.dZ_dmu()/q.Z for q in self.truncnorms])
+        dC_dcav_vars = np.array([q.dZ_dvar()/q.Z for q in self.truncnorms])
+        dC_dbeta = np.dot(dcav_means_dbeta, dC_dcav_means) + np.dot(dcav_vars_dbeta, dC_dcav_vars)
+        dC_dYtilde = np.dot(dcav_means_dYtilde, dC_dcav_means)
 
         #sum gradients from all the different parts
-        dL_dbeta = dA_dbeta + dB_dbeta + dC_dbeta
-        dL_dYtilde = dA_dYtilde + dB_dYtilde + dC_dYtilde
+        dL_dbeta = dA_dbeta + dB_dbeta + dC_dbeta*0
+        dL_dYtilde = dA_dYtilde + dB_dYtilde + dC_dYtilde*0
 
         dL_dK = np.eye(self.num_data) # TODO
 
@@ -116,7 +120,7 @@ class classification(GPy.core.Model):
 
 
 if __name__=='__main__':
-    N = 2
+    N = 50
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.where(X>0.5,1,0).flatten()

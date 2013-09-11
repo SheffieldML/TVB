@@ -21,6 +21,18 @@ class truncnorm:
         if self.side == 'right':
             self.Z = scipynorm.cdf(-self.mu / self.sigma)
 
+    def dZ_dmu(self):
+        if self.side == 'left':
+            return scipynorm.pdf(self.mu/self.sigma)/self.sigma
+        if self.side == 'right':
+            return -scipynorm.pdf(self.mu/self.sigma)/self.sigma
+
+    def dZ_dvar(self):
+        if self.side == 'left':
+            return -0.5*scipynorm.pdf(self.mu/self.sigma)*self.mu/self.sigma/self.sigma2
+        if self.side == 'right':
+            return 0.5*scipynorm.pdf(self.mu/self.sigma)*self.mu/self.sigma/self.sigma2
+
     def pdf(self,x):
         p = scipynorm.pdf(x,loc=self.mu,scale=self.sigma)
         if self.side=='left':
@@ -192,12 +204,35 @@ class TestTruncnorm(Model, truncnorm):
         return np.array([self.mu, self.sigma])
     def log_likelihood(self):
         self.compute_Z()
-        return self.H()
+        #return self.H()
     def _log_likelihood_gradients(self):
         self.compute_Z()
         # return np.array([self.dH_dmu(), self.dH_dvar()])
         return np.array([self.dH_dmu(), self.dH_dvar() * 2 * self.sigma])
+
+class TestTruncnorm2(Model, truncnorm):
+    def __init__(self, mu, sigma2, side):
+        self.mu, self.sigma2, self.side = mu, sigma2, side
+        self.sigma = np.sqrt(self.sigma2)
+        self.compute_Z()
+        super(TestTruncnorm2, self).__init__()
+    def _get_param_names(self):
+        return ['mu', 'var']
+    def _set_params(self, x):
+        self.mu = float(x[0])
+        self.sigma2 = float(x[1])
+        self.sigma = np.sqrt(self.sigma2)
+        self.compute_Z()
+    def _get_params(self):
+        self.compute_Z()
+        return np.array([self.mu, self.sigma2])
+    def log_likelihood(self):
+        self.compute_Z()
+        return self.Z
+    def _log_likelihood_gradients(self):
+        self.compute_Z()
+        return np.array([self.dZ_dmu(), self.dZ_dvar()])
 if __name__ == '__main__':
     mu, sigma = np.random.randn(), np.random.rand()
-    t_left = TestTruncnorm(mu, sigma, 'left')
-    t_right = TestTruncnorm(mu, sigma, 'right')
+    t_left = TestTruncnorm2(mu, sigma, 'left')
+    t_right = TestTruncnorm2(mu, sigma, 'right')

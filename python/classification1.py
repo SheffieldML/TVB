@@ -77,9 +77,9 @@ class classification(GPy.core.Model):
         dB_dcav_means = np.array([q.dH_dmu() for q in self.truncnorms])
         dB_dcav_vars = np.array([q.dH_dvar() for q in self.truncnorms])
 
-		#partial derivatives: watch the broadcast!
+        # partial derivatives: watch the broadcast!
         #watch the broadcast!
-		dcav_means_dbeta_old = (self.Ytilde[:, None] - self.cavity_means) * self.Sigma
+        dcav_means_dbeta_old = (self.Ytilde[:, None] - self.cavity_means) * self.Sigma
         #dcav_vars_dYtilde = 0
         dcav_vars_dbeta = -(self.Sigma**2 / self.diag_Sigma**2 - np.eye(self.num_data) )*self.cavity_vars**2
         dcav_means_dbeta_l = dcav_vars_dbeta * (self.mu / self.diag_Sigma - self.Ytilde * self.beta)
@@ -91,12 +91,12 @@ class classification(GPy.core.Model):
         dcav_means_dbeta += self.cavity_vars * self.Sigma / self.diag_Sigma * (self.Ytilde[:, None] - self.mu[:, None])
         dcav_means_dbeta += self.mu * self.cavity_vars * (self.Sigma / self.diag_Sigma) ** 2
         dcav_means_dbeta -= self.cavity_means * self.Ytilde * np.eye(self.beta.shape[0])
-	
+
         #dcav_vars_dYtilde = 0
         dcav_means_dYtilde = (self.Sigma * self.beta[:, None] / self.diag_Sigma - np.diag(self.beta)) * self.cavity_vars
 
-        dB_dbeta = np.dot(dcav_means_dbeta, dq_dcav_means) + np.dot(dcav_vars_dbeta, dq_dcav_vars)
-        dB_dYtilde = np.dot(dcav_means_dYtilde, dq_dcav_means)
+        dB_dbeta = np.dot(dcav_means_dbeta, dB_dcav_means) + np.dot(dcav_vars_dbeta, dB_dcav_vars)
+        dB_dYtilde = np.dot(dcav_means_dYtilde, dB_dcav_means)
 
         #C
         dC_dcav_means = np.array([q.dZ_dmu()/q.Z for q in self.truncnorms])

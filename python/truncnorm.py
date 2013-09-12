@@ -9,7 +9,6 @@ pb.ion()
 # pb.close('all')
 
 class truncnorm:
-
     def __init__(self, mu, sigma2, side='left'):
         self.mu, self.sigma2, self.side  =  mu, sigma2, side
         self.sigma = np.sqrt(self.sigma2)

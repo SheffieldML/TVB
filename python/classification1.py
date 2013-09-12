@@ -121,8 +121,15 @@ class classification(GPy.core.Model):
     def _predict_raw(self, Xnew):
         """Predict the underlying GP function"""
         Kx = self.kern.K(Xnew, self.X)
-        mu = np.dot(Kx, self.Ki).dot(self.mu)
-        return mu, 1
+        Kxx = self.kern.Kdiag(Xnew)
+        L = GPy.util.linalg.jitchol(self.K + np.diag(1./self.beta))
+        tmp, _ = GPy.util.linalg.dpotrs(L, self.Ytilde, lower=1)
+        mu = np.dot(Kx, tmp)
+        mu_ = np.dot(Kx, self.Ki).dot(self.mu)
+        stop
+        tmp, _ = GPy.util.linalg.dtrtrs(L, Kx.T, lower=1)
+        var = Kxx - np.sum(np.square(tmp), 0)
+        return mu, var
 
 
     def plot(self):
@@ -132,7 +139,7 @@ class classification(GPy.core.Model):
         #pb.legend()
         Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
         mu, var = self._predict_raw(Xtest)
-        pb.plot(Xtest, mu, color='b')
+        GPy.util.plot.gpplot(Xtest, mu, mu - 2*np.sqrt(var), mu + 2*np.sqrt(var))
 
 
 if __name__=='__main__':
@@ -141,16 +148,14 @@ if __name__=='__main__':
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.where(X>0.5,1,0).flatten()
-    Y = np.random.permutation(Y)
+    #Y = np.random.permutation(Y)
     k = GPy.kern.rbf(1, .6, 0.2) + GPy.kern.white(1, 1e-1)
     m = classification(X, Y, k)
     m.constrain_positive('beta')
     m.constrain_fixed('rbf')
     m.constrain_fixed('white')
-    #m.optimize('simplex', max_f_eval=20000, messages=1)
-    m.randomize()
-    m.checkgrad(verbose=True)
-    m.optimize('bfgs', messages=1, max_iters=200)
+    #m.randomize();     m.checkgrad(verbose=True)
+    m.optimize('bfgs', messages=1, max_iters=20)
     m.plot()
 
     mm = GPy.models.GPClassification(X,Y[:,None],kernel=k)

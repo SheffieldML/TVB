@@ -130,7 +130,7 @@ class truncnorm:
         return 1 - dmean_dmu_partial  # this is right!
 
     def dvar_dmu(self):
-        mu = self.mu, sigma
+        mu = self.mu
         N = scipynorm.pdf(self.mu / self.sigma)
         if self.side == 'right':
             mu = -mu

@@ -64,12 +64,10 @@ class classification(GPy.core.Model):
         #relative likelihood/ pseudo-likelihood normalisers
         C = np.sum(np.log([q.Z for q in self.truncnorms]))
         #C += - ??
-        #return A + B + C
         D = (-.5 * self.num_data * np.log(2 * np.pi)
              + np.sum(-.5 * np.log(1. / self.beta + self.cavity_vars)
-                    - .5 * (self.Ytilde - self.cavity_means) ** 2 / (1. / self.beta + self.cavity_vars)
-                      ))
-        return D
+                      - .5 * (self.Ytilde - self.cavity_means) ** 2 / (1. / self.beta + self.cavity_vars)))
+        return A + B + C + D
 
     def _log_likelihood_gradients(self):
         # partial derivatives: watch the broadcast!
@@ -106,13 +104,12 @@ class classification(GPy.core.Model):
         ym = (self.Ytilde - self.cavity_means)
         dD_dYtilde = np.sum(-ym * (delta - dcav_means_dYtilde) / bv, 1)
         dD_dbeta = (-.5 * np.sum((dcav_vars_dbeta - delta / self.beta ** 2) / bv, 1)
-                    + np.sum(-.5 * (self.Ytilde - self.cavity_means) ** 2 * ((dcav_vars_dbeta - (np.eye(self.num_data) / self.beta ** 2)) / bv ** 2)
-                             + ym / (1. / self.beta + self.cavity_vars), 1)
-                    )
+                    + np.sum(+.5 * ym ** 2 * ((dcav_vars_dbeta - (np.eye(self.num_data) / self.beta ** 2)) / bv ** 2)
+                             + ym * dcav_means_dbeta / (1. / self.beta + self.cavity_vars), 1))
 
         #sum gradients from all the different parts
-        dL_dbeta = dA_dbeta * 0 + dB_dbeta * 0 + dC_dbeta * 0 + dD_dbeta
-        dL_dYtilde = dA_dYtilde * 0 + dB_dYtilde * 0 + dC_dYtilde * 0 + dD_dYtilde
+        dL_dbeta = dA_dbeta + dB_dbeta + dC_dbeta + dD_dbeta
+        dL_dYtilde = dA_dYtilde + dB_dYtilde + dC_dYtilde + dD_dYtilde
 
         dL_dK = np.eye(self.num_data) # TODO
 

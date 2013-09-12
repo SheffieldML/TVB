@@ -23,7 +23,7 @@ class classification(GPy.core.Model):
         self.beta = x[self.num_data:2*self.num_data]
         self.kern._set_params_transformed(x[2*self.num_data:])
 
-        #compute approximate posterior mean and variance - this is q(f) in RassWill notation, 
+        #compute approximate posterior mean and variance - this is q(f) in RassWill notation,
         # and p(f | \tilde y) in ours
         self.K = self.kern.K(self.X)
         self.Ki, self.L, _,self.K_logdet = GPy.util.linalg.pdinv(self.K)
@@ -34,7 +34,6 @@ class classification(GPy.core.Model):
         #compute cavity means, vars (all at once!)
         self.cavity_vars = 1./(1./self.diag_Sigma - self.beta)
         self.cavity_means = self.cavity_vars * (self.mu/self.diag_Sigma - self.Ytilde*self.beta)
-
 
         #compute q-distributions...
         self.truncnorms = [truncnorm(mu, var, ('left' if y==1 else 'right')) for mu, var, y in zip(self.cavity_means, self.cavity_vars, self.Y.flatten())]
@@ -52,8 +51,7 @@ class classification(GPy.core.Model):
     def log_likelihood(self):
         #expectation of log pseudo-likelihood times prior under q
         A = -self.num_data*np.log(2*np.pi) + 0.5*np.log(self.beta).sum() - 0.5*self.K_logdet
-        # A += -0.5*np.sum(self.beta*(np.square(self.Ytilde - self.q_means) + self.q_vars))
-        A += -0.5 * np.sum(self.beta * (np.square(self.Ytilde) + self.q_vars))
+        A += -0.5*np.sum(self.beta*(np.square(self.Ytilde) + np.square(self.q_means)  + self.q_vars - 2.*self.q_means*self.Ytilde))
         tmp, _ = GPy.util.linalg.dtrtrs(self.L,self.q_means, lower=1)
         A += -0.5*np.sum(np.square(tmp)) - 0.5*np.sum(np.diag(self.Ki)*self.q_vars)
 
@@ -62,14 +60,14 @@ class classification(GPy.core.Model):
 
         #relative likelihood/ pseudo-likelihood normalisers
         C = np.sum(np.log([q.Z for q in self.truncnorms]))
-        #C += - ??
-        #return A + B + C
         D = (-.5 * self.num_data * np.log(2 * np.pi)
              + np.sum(-.5 * np.log(1. / self.beta + self.cavity_vars)
                       - .5 * (self.Ytilde - self.cavity_means) ** 2 / (1. / self.beta + self.cavity_vars)))
         return A + B + C + D
 
     def _log_likelihood_gradients(self):
+        """first compute gradients wrt cavity means/vars, then chain"""
+
         # partial derivatives: watch the broadcast!
         dcav_vars_dbeta = -(self.Sigma**2 / self.diag_Sigma**2 - np.eye(self.num_data) )*self.cavity_vars**2 # correct!
         #dcav_vars_dYtilde = 0
@@ -79,7 +77,6 @@ class classification(GPy.core.Model):
         tmp =self.Sigma/self.diag_Sigma
         dcav_means_dbeta += (tmp*(self.Ytilde[:,None] - self.mu[:,None]) + tmp**2*self.mu - np.diag(self.Ytilde))*self.cavity_vars
 
-        #first compute gradients wrt cavity means/vars, then chain
         #A
         dA_dYtilde =  self.beta * (self.q_means - self.Ytilde)
         dA_dbeta = 0.5/self.beta - 0.5*(np.square(self.Ytilde) + np.square(self.q_means) + self.q_vars -2.*self.q_means*self.Ytilde)
@@ -129,21 +126,22 @@ class classification(GPy.core.Model):
 
 
     def plot(self):
-        #pb.errorbar(self.X[:,0],self.Ytilde,yerr=2*np.sqrt(1./self.beta), fmt=None, label='approx. likelihood')
+        pb.errorbar(self.X[:,0],self.Ytilde,yerr=2*np.sqrt(1./self.beta), fmt=None, label='approx. likelihood', ecolor='r')
         #pb.errorbar(self.X[:,0]+0.01,self.q_means,yerr=2*np.sqrt(self.q_vars), fmt=None, label='q(f) (non Gauss.)')
-        pb.errorbar(self.X[:,0],self.mu,yerr=2*np.sqrt(np.diag(self.Sigma)), fmt=None, label='approx. posterior')
+        pb.errorbar(self.X[:,0],self.mu,yerr=2*np.sqrt(np.diag(self.Sigma)), fmt=None, label='approx. posterior', ecolor='b')
         #pb.legend()
         Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
         mu, var = self._predict_raw(Xtest)
-        pb.plot(Xtest, mu)
+        pb.plot(Xtest, mu, color='b')
 
 
 if __name__=='__main__':
     pb.close('all')
-    N = 3
+    N = 20
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.where(X>0.5,1,0).flatten()
+    Y = np.random.permutation(Y)
     k = GPy.kern.rbf(1, .6, 0.2) + GPy.kern.white(1, 1e-1)
     m = classification(X, Y, k)
     m.constrain_positive('beta')
@@ -159,4 +157,4 @@ if __name__=='__main__':
     mm.constrain_fixed('')
     mm.update_likelihood_approximation()
     mm.plot_f()
-    pb.errorbar(mm.X[:,0],mm.likelihood.Y[:,0],yerr=2*np.sqrt(1./mm.likelihood.precision[:,0]), fmt=None)
+    pb.errorbar(mm.X[:,0],mm.likelihood.Y[:,0],yerr=2*np.sqrt(1./mm.likelihood.precision[:,0]), fmt=None, color='r')

@@ -35,7 +35,7 @@ class classification(GPy.core.Model):
         self.cavity_vars = 1./(1./self.diag_Sigma - self.beta)
         self.cavity_means = self.cavity_vars * (self.mu/self.diag_Sigma - self.Ytilde*self.beta)
 
-        #compute q-distributions...
+        #compute tilted distributions...
         self.truncnorms = [truncnorm(mu, var, ('left' if y==1 else 'right')) for mu, var, y in zip(self.cavity_means, self.cavity_vars, self.Y.flatten())]
         self.q_means = np.array([q.mean() for q in self.truncnorms])
         self.q_vars = np.array([q.var() for q in self.truncnorms])
@@ -63,7 +63,7 @@ class classification(GPy.core.Model):
         D = (-.5 * self.num_data * np.log(2 * np.pi)
              + np.sum(-.5 * np.log(1. / self.beta + self.cavity_vars)
                       - .5 * (self.Ytilde - self.cavity_means) ** 2 / (1. / self.beta + self.cavity_vars)))
-        return A + B + C + D
+        return A + B #+ C + D
 
     def _log_likelihood_gradients(self):
         """first compute gradients wrt cavity means/vars, then chain"""
@@ -111,8 +111,8 @@ class classification(GPy.core.Model):
                              + ym * dcav_means_dbeta / (1. / self.beta + self.cavity_vars), 1))
 
         #sum gradients from all the different parts
-        dL_dbeta = dA_dbeta + dB_dbeta + dC_dbeta + dD_dbeta
-        dL_dYtilde = dA_dYtilde + dB_dYtilde + dC_dYtilde + dD_dYtilde
+        dL_dbeta = dA_dbeta + dB_dbeta #+ dC_dbeta + dD_dbeta
+        dL_dYtilde = dA_dYtilde + dB_dYtilde #+ dC_dYtilde + dD_dYtilde
 
         dL_dK = np.eye(self.num_data) # TODO
 
@@ -126,7 +126,6 @@ class classification(GPy.core.Model):
         tmp, _ = GPy.util.linalg.dpotrs(L, self.Ytilde, lower=1)
         mu = np.dot(Kx, tmp)
         mu_ = np.dot(Kx, self.Ki).dot(self.mu)
-        stop
         tmp, _ = GPy.util.linalg.dtrtrs(L, Kx.T, lower=1)
         var = Kxx - np.sum(np.square(tmp), 0)
         return mu, var
@@ -155,7 +154,7 @@ if __name__=='__main__':
     m.constrain_fixed('rbf')
     m.constrain_fixed('white')
     #m.randomize();     m.checkgrad(verbose=True)
-    m.optimize('bfgs', messages=1, max_iters=20)
+    m.optimize('bfgs', messages=1, max_iters=50)
     m.plot()
 
     mm = GPy.models.GPClassification(X,Y[:,None],kernel=k)

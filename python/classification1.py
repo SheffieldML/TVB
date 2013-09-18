@@ -4,6 +4,7 @@ import GPy
 from truncnorm import truncnorm
 from GPy.models.gradient_checker import GradientChecker
 from scipy.special import erf
+import tilted
 
 class classification(GPy.core.Model):
     def __init__(self, X, Y, kern):
@@ -148,7 +149,7 @@ class classification(GPy.core.Model):
         #pb.errorbar(self.X[:,0],self.mu,yerr=2*np.sqrt(np.diag(self.Sigma)), fmt=None, label='approx. posterior', ecolor='b')
         Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
         mu, var = self._predict_raw(Xtest)
-        GPy.util.plot.gpplot(Xtest, mu, mu - 2*np.sqrt(var), mu + 2*np.sqrt(var))
+        GPy.util.plot.gpplot(Xtest, mu, mu - 2 * np.sqrt(var), mu + 2 * np.sqrt(var))
 
     def plot(self):
         pb.figure()

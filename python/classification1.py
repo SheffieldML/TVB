@@ -3,7 +3,7 @@ import pylab as pb
 import GPy
 from truncnorm import truncnorm
 from GPy.models.gradient_checker import GradientChecker
-import tilted
+from scipy.special import erf
 
 class classification(GPy.core.Model):
     def __init__(self, X, Y, kern):
@@ -142,31 +142,42 @@ class classification(GPy.core.Model):
         return mu, var
 
 
-    def plot(self):
+    def plot_f(self):
+        pb.figure()
         pb.errorbar(self.X[:,0],self.Ytilde,yerr=2*np.sqrt(1./self.beta), fmt=None, label='approx. likelihood', ecolor='r')
-        #pb.errorbar(self.X[:,0]+0.01,self.tilted.mean,yerr=2*np.sqrt(self.tilted.var), fmt=None, label='q(f) (non Gauss.)')
-        pb.errorbar(self.X[:,0],self.mu,yerr=2*np.sqrt(np.diag(self.Sigma)), fmt=None, label='approx. posterior', ecolor='b')
-        #pb.legend()
+        #pb.errorbar(self.X[:,0],self.mu,yerr=2*np.sqrt(np.diag(self.Sigma)), fmt=None, label='approx. posterior', ecolor='b')
         Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
         mu, var = self._predict_raw(Xtest)
         GPy.util.plot.gpplot(Xtest, mu, mu - 2*np.sqrt(var), mu + 2*np.sqrt(var))
 
+    def plot(self):
+        pb.figure()
+        Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
+        mu, var = self._predict_raw(Xtest)
+
+        #GPy.util.plot.gpplot(Xtest, mu, mu - 2*np.sqrt(var), mu + 2*np.sqrt(var))
+        pb.plot(self.X, self.Y, 'kx', mew=1)
+        pb.plot(Xtest, 0.5*(1+erf(mu/np.sqrt(2.*var))), linewidth=2)
+        pb.ylim(-.1, 1.1)
+
+
+
 
 if __name__=='__main__':
-    N = 55
+    pb.close('all')
+    N = 20
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.zeros(N)
     Y[X[:, 0] < 3. / 4] = 1.
     Y[X[:, 0] < 1. / 4] = 0.
-#     Y = np.random.permutation(Y)
+    #Y = np.random.permutation(Y)
+    #pb.plot(X[:, 0], Y, 'kx')
     k = GPy.kern.rbf(1) + GPy.kern.white(1, 1e-5)
     m = classification(X, Y, k.copy())
     m.constrain_positive('beta')
-#     m.randomize();     m.checkgrad(verbose=True)
-    m.optimize('bfgs', messages=1)  # , max_iters=20, max_f_eval=20)
-    pb.figure(1)
-    pb.clf()
+    #m.randomize();     m.checkgrad(verbose=True)
+    m.optimize('bfgs', messages=1)#, max_iters=20, max_f_eval=20)
     m.plot()
 
     mean, var = m._predict_raw(X)[:2]

@@ -20,6 +20,7 @@ class classification(GPy.core.Model):
         self.tilted = tilted.Heaviside(self.Y)
 
         self.ensure_default_constraints()
+        self.constrain_positive('beta')
 
     def _set_params(self,x):
         self.Ytilde = x[:self.num_data]
@@ -71,7 +72,6 @@ class classification(GPy.core.Model):
 
         # partial derivatives: watch the broadcast!
         dcav_vars_dbeta = -(self.Sigma**2 / self.diag_Sigma**2 - np.eye(self.num_data) )*self.cavity_vars**2 # correct!
-        #dcav_vars_dYtilde = 0
         dcav_means_dYtilde = (self.Sigma * self.beta[:, None] / self.diag_Sigma - np.diag(self.beta)) * self.cavity_vars # correct!
 
         dcav_means_dbeta = dcav_vars_dbeta * (self.mu / self.diag_Sigma - self.Ytilde * self.beta)
@@ -100,32 +100,36 @@ class classification(GPy.core.Model):
 
         # D
         delta = np.eye(self.num_data)
-        bv = (1. / self.beta + self.cavity_vars)
-        ym = (self.Ytilde - self.cavity_means)
-        dD_dYtilde = np.sum(ym * (delta - dcav_means_dYtilde) / bv, 1)
-        dD_dcav_means = -np.sum(ym * delta / bv, 1)
+        bv = 1. / self.beta + self.cavity_vars
+        ym = self.Ytilde - self.cavity_means
+        dD_dYtilde = np.dot(delta-dcav_means_dYtilde, ym/bv)
+        dD_dcav_means = -ym / bv
+        #TODO: tidy this monster!
         dD_dbeta = -(-.5 * np.sum((dcav_vars_dbeta - delta / self.beta ** 2) / bv, 1)
                     + np.sum(.5 * ym ** 2 * ((dcav_vars_dbeta - (delta / self.beta ** 2)) / bv ** 2)
                              + ym * dcav_means_dbeta / (1. / self.beta + self.cavity_vars), 1))
-        dD_dcav_vars = .5 * np.sum((delta / bv) * (1. - (ym ** 2 / bv)), 1)
+        dD_dcav_vars = 0.5 * (1-ym**2/bv)/bv
 
         #sum gradients from all the different parts
         dL_dbeta = dA_dbeta + dB_dbeta + dC_dbeta + dD_dbeta
         dL_dYtilde = dA_dYtilde + dB_dYtilde + dC_dYtilde + dD_dYtilde
 
+        #ok, now gradient for K
         SigmaKi = self.Sigma.dot(self.Ki)
-        # dcav_vars_dSigma = 1. / ((1. / self.diag_Sigma - self.beta) * self.diag_Sigma) ** 2
-        vars_inv = 1. / (1 - self.diag_Sigma * self.beta)[:,None,None]
-        dcav_vars_dK = ((vars_inv ** 2) * (SigmaKi[:, None, :] * SigmaKi[:, :, None]))
 
-        dcav_means_dK = dcav_vars_dK * (self.mu / self.diag_Sigma - self.Ytilde * self.beta)[:, None, None]
-        dmu_dK = (np.dot(self.Ki, self.mu)[None, None, :] * SigmaKi[:, :, None])  # correct!
-        dSigma_inv_dK = (SigmaKi[:, None, :] * SigmaKi[:, :, None]) / self.diag_Sigma[:, None, None]  # correct!
-        dcav_means_dK += vars_inv * (dmu_dK - self.mu[:, None, None] * dSigma_inv_dK)
+        #TODO: tidy this monster!
+        tmp = (dA_dcav_vars + self.tilted.dH_dsigma2 + self.tilted.dZ_dsigma2/self.tilted.Z + dD_dcav_vars)/np.square(1 - self.diag_Sigma * self.beta)
+        tmp += (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)* ((self.mu / self.diag_Sigma - self.Ytilde * self.beta)/np.square(1-self.diag_Sigma*self.beta))
+        tmp += -(dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)/(1 - self.diag_Sigma * self.beta)*self.mu/self.diag_Sigma
 
-        dL_dK = (((dA_dcav_vars + self.tilted.dH_dsigma2 + self.tilted.dZ_dsigma2/self.tilted.Z + dD_dcav_vars)[:, None, None] * dcav_vars_dK).sum(0)
-                 + ((dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)[:, None, None] * dcav_means_dK).sum(0))
-        dL_dK += -.5 * self.Ki.dot(np.eye(self.num_data) - (self.tilted.mean[:, None].dot(self.tilted.mean[None, :]) + np.eye(self.num_data) * self.tilted.var).dot(self.Ki))
+        dL_dK = np.dot(SigmaKi.T*tmp,SigmaKi)
+
+        tmp = (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)/(1 - self.diag_Sigma * self.beta)
+        dL_dK += np.dot(SigmaKi.T, tmp)[:,None] * np.dot(self.Ki, self.mu)[None,:]
+
+
+        dL_dK -= 0.5*self.Ki
+        dL_dK += 0.5 * self.Ki.dot((self.tilted.mean[:, None].dot(self.tilted.mean[None, :]) + np.diag(self.tilted.var)).dot(self.Ki))
 
         return np.hstack((dL_dYtilde, dL_dbeta, self.kern.dK_dtheta(dL_dK, self.X)))
 
@@ -143,12 +147,17 @@ class classification(GPy.core.Model):
 
 
     def plot_f(self):
-        pb.figure()
-        pb.errorbar(self.X[:,0],self.Ytilde,yerr=2*np.sqrt(1./self.beta), fmt=None, label='approx. likelihood', ecolor='r')
-        #pb.errorbar(self.X[:,0],self.mu,yerr=2*np.sqrt(np.diag(self.Sigma)), fmt=None, label='approx. posterior', ecolor='b')
-        Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
-        mu, var = self._predict_raw(Xtest)
-        GPy.util.plot.gpplot(Xtest, mu, mu - 2*np.sqrt(var), mu + 2*np.sqrt(var))
+        if self.X.shape[1]==1:
+            pb.figure()
+            pb.errorbar(self.X[:,0],self.Ytilde,yerr=2*np.sqrt(1./self.beta), fmt=None, label='approx. likelihood', ecolor='r')
+            Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
+            mu, var = self._predict_raw(Xtest)
+            GPy.util.plot.gpplot(Xtest, mu, mu - 2*np.sqrt(var), mu + 2*np.sqrt(var))
+        elif self.X.shape[1]==2:
+            pb.figure()
+            Xtest,xx,yy, xymin, xymax = GPy.util.plot.x_frame2D(self.X)
+            mu, var = self._predict_raw(Xtest)
+            pb.contour(xx,yy,mu.reshape(*xx.shape))
 
     def plot(self):
         pb.figure()

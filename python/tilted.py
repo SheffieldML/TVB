@@ -40,6 +40,10 @@ class Heaviside(Tilted):
         self.dvar_dmu = -self.Ysign*self.sigma *self.N_Z + self.a * self.mu * self.N_Z + 3 * self.mu * self.N_Z2 + 2 * self.Ysign * self.sigma * self.N_Z3
         self.dvar_dsigma2 = 1 - self.N_Z * (self.N_Z + self.a * (.5 + .5*self.a**2 + self.N_Z * (1.5*self.a + self.N_Z)))
 
+        #derivatives of Z
+        self.dZ_dmu = self.N*self.Ysign/self.sigma
+        self.dZ_dsigma2 = -0.5*self.N*self.Ysign*self.mu/self.sigma2/self.sigma
+
         #compute entropy
         self.H = 0.5*np.log(2*np.pi*self.sigma2) + np.log(self.Z) + 0.5*(self.mu**2 + self.var + self.mean**2 - 2*self.mean*self.mu)/self.sigma2
 

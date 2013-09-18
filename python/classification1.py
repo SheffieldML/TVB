@@ -35,7 +35,7 @@ class classification(GPy.core.Model):
         self.cavity_vars = 1./(1./self.diag_Sigma - self.beta)
         self.cavity_means = self.cavity_vars * (self.mu/self.diag_Sigma - self.Ytilde*self.beta)
 
-        #compute q-distributions...
+        #compute tilted distributions...
         self.truncnorms = [truncnorm(mu, var, ('left' if y==1 else 'right')) for mu, var, y in zip(self.cavity_means, self.cavity_vars, self.Y.flatten())]
         self.q_means = np.array([q.mean() for q in self.truncnorms])
         self.q_vars = np.array([q.var() for q in self.truncnorms])
@@ -63,7 +63,6 @@ class classification(GPy.core.Model):
         D = -(.5 * self.num_data * np.log(2 * np.pi)
               + np.sum(.5 * np.log(1. / self.beta + self.cavity_vars)
                        + .5 * (self.Ytilde - self.cavity_means) ** 2 / (1. / self.beta + self.cavity_vars)))
-#         return self.cavity_means[9]
         return A + B + C + D
 
     def _log_likelihood_gradients(self):
@@ -157,49 +156,21 @@ class classification(GPy.core.Model):
 
 
 if __name__=='__main__':
-#     pb.close('all')
-#     np.random.seed(1)
-    N = 50
+    pb.close('all')
+    N = 20
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.where(X>0.5,1,0).flatten()
     #Y = np.random.permutation(Y)
-    k = GPy.kern.rbf(1, .6, 0.2) + GPy.kern.white(1, 1e-1)
+    k = GPy.kern.rbf(1) + GPy.kern.white(1)
     m = classification(X, Y, k)
     m.constrain_positive('beta')
-    # m.constrain_fixed('rbf')
-    # m.constrain_fixed('white')
-#     m['rbf_var'] = .5
-#     m['rbf_len'] = .1
-#     m['white'] = .1
-#     m['beta'] = 1
-#     m['Ytilde'] = 1
+    # m.randomize();     m.checkgrad(verbose=True)
+    m.optimize('bfgs', messages=1, max_iters=20, max_f_eval=20)
+    m.plot()
 
-    m.checkgrad('.*|rbf|whit', verbose=True)
-    m.optimize('bfgs', messages=1, max_iters=20)
-#     m.plot()
-
-#     mm = GPy.models.GPClassification(X,Y[:,None],kernel=k)
-#     mm.constrain_fixed('')
-#     mm.update_likelihood_approximation()
-#     mm.plot_f()
-#     pb.errorbar(mm.X[:,0],mm.likelihood.Y[:,0],yerr=2*np.sqrt(1./mm.likelihood.precision[:,0]), fmt=None, color='r')
-
-    #     m.optimize('scg', messages=1, max_iters=200)
-#     pb.figure(1); pb.clf()
-#     m.plot()
-#     pb.hlines(0, pb.xlim()[0], pb.xlim()[1], 'k', '--')
-#
-#     mm = GPy.models.GPClassification(X, Y[:, None], kernel=k)
-#     mm.constrain_fixed('')
-#     mm.update_likelihood_approximation()
-#     pb.figure(2); pb.clf()
-#     mm.plot_f(fignum=2)
-#     pb.errorbar(mm.X[:, 0], mm.likelihood.Y[:, 0], yerr=2 * np.sqrt(1. / mm.likelihood.precision[:, 0]), fmt=None, color='r')
-#     pb.hlines(0, pb.xlim()[0], pb.xlim()[1], 'k', '--')
-#
-#     pb.figure(3); pb.clf()
-#     pb.scatter(m.X[:, 0], m._predict_raw(m.X)[0] > 0, color="r", s=40, marker='o', label="varEP", edgecolor="")
-#     pb.scatter(mm.X[:, 0], mm._raw_predict(mm.X)[0] > 0, color="b", s=40, marker='o', label="EP", facecolor="")
-#     pb.vlines(m.X[:, 0], 0, 1, 'k', '--', alpha=.3)
-#     pb.legend(loc='center right', scatterpoints=1)
+    mm = GPy.models.GPClassification(X, Y[:, None], kernel=k.copy())
+    mm.constrain_fixed('')
+    mm.pseudo_EM()
+    mm.plot_f()
+    pb.errorbar(mm.X[:,0],mm.likelihood.Y[:,0],yerr=2*np.sqrt(1./mm.likelihood.precision[:,0]), fmt=None, color='r')

@@ -21,12 +21,13 @@ class classification(GPy.core.Model):
     def _set_params(self,x):
         self.Ytilde = x[:self.num_data]
         self.beta = x[self.num_data:2*self.num_data]
+        # self.beta[self.beta < 1e-9] = 1e-9
         self.kern._set_params_transformed(x[2*self.num_data:])
 
         #compute approximate posterior mean and variance - this is q(f) in RassWill notation,
         # and p(f | \tilde y) in ours
         self.K = self.kern.K(self.X)
-        self.Ki, self.L, _,self.K_logdet = GPy.util.linalg.pdinv(self.K)
+        self.Ki, self.L, _, self.K_logdet = GPy.util.linalg.pdinv(self.K)
         self.Sigma,_,_,_ = GPy.util.linalg.pdinv(self.Ki + np.diag(self.beta))
         self.diag_Sigma = np.diag(self.Sigma)
         self.mu = np.dot(self.Sigma, self.beta*self.Ytilde )
@@ -60,7 +61,7 @@ class classification(GPy.core.Model):
 
         #relative likelihood/ pseudo-likelihood normalisers
         C = np.sum(np.log([q.Z for q in self.truncnorms]))
-        D = -(.5 * self.num_data * np.log(2 * np.pi)
+        D = (.5 * self.num_data * np.log(2 * np.pi)
               + np.sum(.5 * np.log(1. / self.beta + self.cavity_vars)
                        + .5 * (self.Ytilde - self.cavity_means) ** 2 / (1. / self.beta + self.cavity_vars)))
         return A + B + C + D
@@ -105,12 +106,12 @@ class classification(GPy.core.Model):
         delta = np.eye(self.num_data)
         bv = (1. / self.beta + self.cavity_vars)
         ym = (self.Ytilde - self.cavity_means)
-        dD_dYtilde = -np.sum(ym * (delta - dcav_means_dYtilde) / bv, 1)
-        dD_dcav_means = np.sum(ym * delta / bv, 1)
-        dD_dbeta = (-.5 * np.sum((dcav_vars_dbeta - delta / self.beta ** 2) / bv, 1)
+        dD_dYtilde = np.sum(ym * (delta - dcav_means_dYtilde) / bv, 1)
+        dD_dcav_means = -np.sum(ym * delta / bv, 1)
+        dD_dbeta = -(-.5 * np.sum((dcav_vars_dbeta - delta / self.beta ** 2) / bv, 1)
                     + np.sum(.5 * ym ** 2 * ((dcav_vars_dbeta - (delta / self.beta ** 2)) / bv ** 2)
                              + ym * dcav_means_dbeta / (1. / self.beta + self.cavity_vars), 1))
-        dD_dcav_vars = -.5 * np.sum((delta / bv) * (1. - (ym ** 2 / bv)), 1)
+        dD_dcav_vars = .5 * np.sum((delta / bv) * (1. - (ym ** 2 / bv)), 1)
 
         #sum gradients from all the different parts
         dL_dbeta = dA_dbeta + dB_dbeta + dC_dbeta + dD_dbeta
@@ -157,20 +158,23 @@ class classification(GPy.core.Model):
 
 if __name__=='__main__':
     pb.close('all')
-    N = 20
+    N = 55
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
-    Y = np.where(X>0.5,1,0).flatten()
-    #Y = np.random.permutation(Y)
-    k = GPy.kern.rbf(1) + GPy.kern.white(1)
-    m = classification(X, Y, k)
+    Y = np.zeros(N)
+    Y[X[:, 0] < 3. / 4] = 1.
+    Y[X[:, 0] < 1. / 4] = 0.
+    Y = np.random.permutation(Y)
+    pb.plot(X[:, 0], Y, 'kx')
+    k = GPy.kern.rbf(1) + GPy.kern.white(1, 1e-5)
+    m = classification(X, Y, k.copy())
     m.constrain_positive('beta')
-    # m.randomize();     m.checkgrad(verbose=True)
-    m.optimize('bfgs', messages=1, max_iters=20, max_f_eval=20)
+#     m.randomize();     m.checkgrad(verbose=True)
+    m.optimize('bfgs', messages=1)  # , max_iters=20, max_f_eval=20)
     m.plot()
-
-    mm = GPy.models.GPClassification(X, Y[:, None], kernel=k.copy())
-    mm.constrain_fixed('')
-    mm.pseudo_EM()
-    mm.plot_f()
-    pb.errorbar(mm.X[:,0],mm.likelihood.Y[:,0],yerr=2*np.sqrt(1./mm.likelihood.precision[:,0]), fmt=None, color='r')
+#
+#     mm = GPy.models.GPClassification(X, Y[:, None], kernel=k.copy())
+#     mm.constrain_fixed('')
+#     mm.pseudo_EM()
+#     mm.plot_f()
+#     pb.errorbar(mm.X[:,0],mm.likelihood.Y[:,0],yerr=2*np.sqrt(1./mm.likelihood.precision[:,0]), fmt=None, color='r')

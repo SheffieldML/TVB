@@ -3,6 +3,7 @@ import pylab as pb
 import GPy
 from truncnorm import truncnorm
 from GPy.models.gradient_checker import GradientChecker
+import tilted
 
 class classification(GPy.core.Model):
     def __init__(self, X, Y, kern):
@@ -152,21 +153,30 @@ class classification(GPy.core.Model):
 
 
 if __name__=='__main__':
-    pb.close('all')
-    N = 20
+    N = 55
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.zeros(N)
     Y[X[:, 0] < 3. / 4] = 1.
     Y[X[:, 0] < 1. / 4] = 0.
-    Y = np.random.permutation(Y)
-    pb.plot(X[:, 0], Y, 'kx')
+#     Y = np.random.permutation(Y)
     k = GPy.kern.rbf(1) + GPy.kern.white(1, 1e-5)
     m = classification(X, Y, k.copy())
     m.constrain_positive('beta')
-    m.randomize();     m.checkgrad(verbose=True)
-    m.optimize('bfgs', messages=1, max_iters=20, max_f_eval=20)
+#     m.randomize();     m.checkgrad(verbose=True)
+    m.optimize('bfgs', messages=1)  # , max_iters=20, max_f_eval=20)
+    pb.figure(1)
+    pb.clf()
     m.plot()
+
+    mean, var = m._predict_raw(X)[:2]
+
+    pb.figure(2)
+    pb.clf()
+    pb.scatter(X[:, 0], Y, color='k', marker='x', s=40)
+    pb.scatter(X[:, 0], mean > 0, c='r', marker='o', facecolor='', edgecolor='r', s=50)
+
+
 #
 #     mm = GPy.models.GPClassification(X, Y[:, None], kernel=k.copy())
 #     mm.constrain_fixed('')

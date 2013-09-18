@@ -161,14 +161,26 @@ class classification(GPy.core.Model):
             pb.contour(xx,yy,mu.reshape(*xx.shape))
 
     def plot(self):
-        pb.figure()
-        Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
-        mu, var = self._predict_raw(Xtest)
+        if self.X.shape[1]==1:
+            pb.figure()
+            Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
+            mu, var = self._predict_raw(Xtest)
 
-        #GPy.util.plot.gpplot(Xtest, mu, mu - 2*np.sqrt(var), mu + 2*np.sqrt(var))
-        pb.plot(self.X, self.Y, 'kx', mew=1)
-        pb.plot(Xtest, 0.5*(1+erf(mu/np.sqrt(2.*var))), linewidth=2)
-        pb.ylim(-.1, 1.1)
+            #GPy.util.plot.gpplot(Xtest, mu, mu - 2*np.sqrt(var), mu + 2*np.sqrt(var))
+            pb.plot(self.X, self.Y, 'kx', mew=1)
+            pb.plot(Xtest, 0.5*(1+erf(mu/np.sqrt(2.*var))), linewidth=2)
+            pb.ylim(-.1, 1.1)
+        elif self.X.shape[1]==2:
+            pb.figure()
+            Xtest,xx,yy, xymin, xymax = GPy.util.plot.x_frame2D(self.X)
+            mu, var = self._predict_raw(Xtest)
+            p =0.5*(1+erf(mu/np.sqrt(2.*var)))
+            c = pb.contour(xx,yy,p.reshape(*xx.shape), [0.1, 0.25, 0.5, 0.75, 0.9], colors='k')
+            pb.clabel(c)
+            i1 = self.Y==1
+            pb.plot(self.X[:,0][i1], self.X[:,1][i1], 'rx', mew=2, ms=8)
+            i2 = self.Y==0
+            pb.plot(self.X[:,0][i2], self.X[:,1][i2], 'wo', mew=2, mec='b')
 
 
 
@@ -192,10 +204,10 @@ if __name__=='__main__':
 
     mean, var = m._predict_raw(X)[:2]
 
-    pb.figure(2)
-    pb.clf()
-    pb.scatter(X[:, 0], Y, color='k', marker='x', s=40)
-    pb.scatter(X[:, 0], mean > 0, c='r', marker='o', facecolor='', edgecolor='r', s=50)
+    #pb.figure(2)
+    #pb.clf()
+    #pb.scatter(X[:, 0], Y, color='k', marker='x', s=40)
+    #pb.scatter(X[:, 0], mean > 0, c='r', marker='o', facecolor='', edgecolor='r', s=50)
 
 
 #

@@ -1,8 +1,8 @@
 import numpy as np
 import pylab as pb
 import GPy
-from truncnorm import truncnorm
 from GPy.models.gradient_checker import GradientChecker
+import tilted
 
 class classification(GPy.core.Model):
     def __init__(self, X, Y, kern):
@@ -15,6 +15,8 @@ class classification(GPy.core.Model):
 
         self.Ytilde = np.zeros(self.num_data)
         self.beta = np.zeros(self.num_data) + 1
+
+        self.tilted = tilted.Heaviside(self.Y)
 
         self.ensure_default_constraints()
 
@@ -36,9 +38,7 @@ class classification(GPy.core.Model):
         self.cavity_means = self.cavity_vars * (self.mu/self.diag_Sigma - self.Ytilde*self.beta)
 
         #compute tilted distributions...
-        self.truncnorms = [truncnorm(mu, var, ('left' if y==1 else 'right')) for mu, var, y in zip(self.cavity_means, self.cavity_vars, self.Y.flatten())]
-        self.q_means = np.array([q.mean() for q in self.truncnorms])
-        self.q_vars = np.array([q.var() for q in self.truncnorms])
+        self.tilted.set_cavity(self.cavity_means, self.cavity_vars)
 
     def _get_params(self):
         return np.hstack((self.Ytilde, self.beta, self.kern._get_params_transformed()))
@@ -51,16 +51,16 @@ class classification(GPy.core.Model):
     def log_likelihood(self):
         #expectation of log pseudo-likelihood times prior under q
         A = -self.num_data*np.log(2*np.pi) + 0.5*np.log(self.beta).sum() - 0.5*self.K_logdet
-        A += -0.5*np.sum(self.beta*(np.square(self.Ytilde) + np.square(self.q_means)  + self.q_vars - 2.*self.q_means*self.Ytilde))
-        tmp, _ = GPy.util.linalg.dtrtrs(self.L,self.q_means, lower=1)
-        A += -0.5*np.sum(np.square(tmp)) - 0.5*np.sum(np.diag(self.Ki)*self.q_vars)
+        A += -0.5*np.sum(self.beta*(np.square(self.Ytilde) + np.square(self.tilted.mean)  + self.tilted.var - 2.*self.tilted.mean*self.Ytilde))
+        tmp, _ = GPy.util.linalg.dtrtrs(self.L,self.tilted.mean, lower=1)
+        A += -0.5*np.sum(np.square(tmp)) - 0.5*np.sum(np.diag(self.Ki)*self.tilted.var)
 
         #entropy
-        B = np.sum([q.H() for q in self.truncnorms])
+        B = self.tilted.H.sum()
 
         #relative likelihood/ pseudo-likelihood normalisers
-        C = np.sum(np.log([q.Z for q in self.truncnorms]))
-        D = -(.5 * self.num_data * np.log(2 * np.pi)
+        C = np.log(self.tilted.Z).sum()
+        D = (.5 * self.num_data * np.log(2 * np.pi)
               + np.sum(.5 * np.log(1. / self.beta + self.cavity_vars)
                        + .5 * (self.Ytilde - self.cavity_means) ** 2 / (1. / self.beta + self.cavity_vars)))
         return A + B + C + D
@@ -78,39 +78,35 @@ class classification(GPy.core.Model):
         dcav_means_dbeta += (tmp*(self.Ytilde[:,None] - self.mu[:,None]) + tmp**2*self.mu - np.diag(self.Ytilde))*self.cavity_vars
 
         #A
-        dA_dYtilde =  self.beta * (self.q_means - self.Ytilde)
-        dA_dbeta = 0.5/self.beta - 0.5*(np.square(self.Ytilde) + np.square(self.q_means) + self.q_vars -2.*self.q_means*self.Ytilde)
-        dA_dq_means = self.beta*(self.Ytilde - self.q_means) - np.dot(self.Ki, self.q_means)
+        dA_dYtilde =  self.beta * (self.tilted.mean - self.Ytilde)
+        dA_dbeta = 0.5/self.beta - 0.5*(np.square(self.Ytilde) + np.square(self.tilted.mean) + self.tilted.var -2.*self.tilted.mean*self.Ytilde)
+        dA_dq_means = self.beta*(self.Ytilde - self.tilted.mean) - np.dot(self.Ki, self.tilted.mean)
         dA_dq_vars = -0.5*(self.beta + np.diag(self.Ki))
-        dA_dcav_vars = dA_dq_vars*np.array([q.dvar_dvar() for q in self.truncnorms])
-        dA_dcav_vars += dA_dq_means*np.array([q.dmean_dvar() for q in self.truncnorms])
-        dA_dcav_means = dA_dq_vars*np.array([q.dvar_dmu() for q in self.truncnorms])
-        dA_dcav_means += dA_dq_means*np.array([q.dmean_dmu() for q in self.truncnorms])
+        dA_dcav_vars = dA_dq_vars*self.tilted.dvar_dsigma2
+        dA_dcav_vars += dA_dq_means*self.tilted.dmean_dsigma2
+        dA_dcav_means = dA_dq_vars*self.tilted.dvar_dmu
+        dA_dcav_means += dA_dq_means*self.tilted.dmean_dmu
         dA_dbeta += np.dot(dcav_means_dbeta, dA_dcav_means) + np.dot(dcav_vars_dbeta, dA_dcav_vars)
         dA_dYtilde += np.dot(dcav_means_dYtilde, dA_dcav_means)
 
         #B
-        dB_dcav_means = np.array([q.dH_dmu() for q in self.truncnorms])
-        dB_dcav_vars = np.array([q.dH_dvar() for q in self.truncnorms])
-        dB_dbeta = np.dot(dcav_means_dbeta, dB_dcav_means) + np.dot(dcav_vars_dbeta, dB_dcav_vars)
-        dB_dYtilde = np.dot(dcav_means_dYtilde, dB_dcav_means)
+        dB_dbeta = np.dot(dcav_means_dbeta, self.tilted.dH_dmu) + np.dot(dcav_vars_dbeta, self.tilted.dH_dsigma2)
+        dB_dYtilde = np.dot(dcav_means_dYtilde, self.tilted.dH_dmu)
 
         #C
-        dC_dcav_means = np.array([q.dZ_dmu()/q.Z for q in self.truncnorms])
-        dC_dcav_vars = np.array([q.dZ_dvar()/q.Z for q in self.truncnorms])
-        dC_dbeta = np.dot(dcav_means_dbeta, dC_dcav_means) + np.dot(dcav_vars_dbeta, dC_dcav_vars)
-        dC_dYtilde = np.dot(dcav_means_dYtilde, dC_dcav_means)
+        dC_dbeta = np.dot(dcav_means_dbeta, self.tilted.dZ_dmu/self.tilted.Z) + np.dot(dcav_vars_dbeta, self.tilted.dZ_dsigma2/self.tilted.Z)
+        dC_dYtilde = np.dot(dcav_means_dYtilde, self.tilted.dZ_dmu/self.tilted.Z)
 
         # D
         delta = np.eye(self.num_data)
         bv = (1. / self.beta + self.cavity_vars)
         ym = (self.Ytilde - self.cavity_means)
-        dD_dYtilde = -np.sum(ym * (delta - dcav_means_dYtilde) / bv, 1)
+        dD_dYtilde = np.sum(ym * (delta - dcav_means_dYtilde) / bv, 1)
         dD_dcav_means = np.sum(ym * delta / bv, 1)
-        dD_dbeta = (-.5 * np.sum((dcav_vars_dbeta - delta / self.beta ** 2) / bv, 1)
+        dD_dbeta = -(-.5 * np.sum((dcav_vars_dbeta - delta / self.beta ** 2) / bv, 1)
                     + np.sum(.5 * ym ** 2 * ((dcav_vars_dbeta - (delta / self.beta ** 2)) / bv ** 2)
                              + ym * dcav_means_dbeta / (1. / self.beta + self.cavity_vars), 1))
-        dD_dcav_vars = -.5 * np.sum((delta / bv) * (1. - (ym ** 2 / bv)), 1)
+        dD_dcav_vars = .5 * np.sum((delta / bv) * (1. - (ym ** 2 / bv)), 1)
 
         #sum gradients from all the different parts
         dL_dbeta = dA_dbeta + dB_dbeta + dC_dbeta + dD_dbeta
@@ -126,9 +122,9 @@ class classification(GPy.core.Model):
         dSigma_inv_dK = (SigmaKi[:, None, :] * SigmaKi[:, :, None]) / self.diag_Sigma[:, None, None]  # correct!
         dcav_means_dK += vars_inv * (dmu_dK - self.mu[:, None, None] * dSigma_inv_dK)
 
-        dL_dK = (((dA_dcav_vars + dB_dcav_vars + dC_dcav_vars + dD_dcav_vars)[:, None, None] * dcav_vars_dK).sum(0)
-                 + ((dA_dcav_means + dB_dcav_means + dC_dcav_means + dD_dcav_means)[:, None, None] * dcav_means_dK).sum(0))
-        dL_dK += -.5 * self.Ki.dot(np.eye(self.num_data) - (self.q_means[:, None].dot(self.q_means[None, :]) + np.eye(self.num_data) * self.q_vars).dot(self.Ki))
+        dL_dK = (((dA_dcav_vars + self.tilted.dH_dsigma2 + self.tilted.dZ_dsigma2/self.tilted.Z + dD_dcav_vars)[:, None, None] * dcav_vars_dK).sum(0)
+                 + ((dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)[:, None, None] * dcav_means_dK).sum(0))
+        dL_dK += -.5 * self.Ki.dot(np.eye(self.num_data) - (self.tilted.mean[:, None].dot(self.tilted.mean[None, :]) + np.eye(self.num_data) * self.tilted.var).dot(self.Ki))
 
         return np.hstack((dL_dYtilde, dL_dbeta, self.kern.dK_dtheta(dL_dK, self.X)))
 
@@ -147,7 +143,7 @@ class classification(GPy.core.Model):
 
     def plot(self):
         pb.errorbar(self.X[:,0],self.Ytilde,yerr=2*np.sqrt(1./self.beta), fmt=None, label='approx. likelihood', ecolor='r')
-        #pb.errorbar(self.X[:,0]+0.01,self.q_means,yerr=2*np.sqrt(self.q_vars), fmt=None, label='q(f) (non Gauss.)')
+        #pb.errorbar(self.X[:,0]+0.01,self.tilted.mean,yerr=2*np.sqrt(self.tilted.var), fmt=None, label='q(f) (non Gauss.)')
         pb.errorbar(self.X[:,0],self.mu,yerr=2*np.sqrt(np.diag(self.Sigma)), fmt=None, label='approx. posterior', ecolor='b')
         #pb.legend()
         Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
@@ -165,7 +161,7 @@ if __name__=='__main__':
     k = GPy.kern.rbf(1) + GPy.kern.white(1)
     m = classification(X, Y, k)
     m.constrain_positive('beta')
-    # m.randomize();     m.checkgrad(verbose=True)
+    m.randomize();     m.checkgrad(verbose=True)
     m.optimize('bfgs', messages=1, max_iters=20, max_f_eval=20)
     m.plot()
 

@@ -33,7 +33,17 @@ class classification(GPy.core.Model):
         self.K = self.kern.K(self.X)
         self.Ki, self.L, _,self.K_logdet = GPy.util.linalg.pdinv(self.K)
         self.Sigma,_,_,_ = GPy.util.linalg.pdinv(self.Ki + np.diag(self.beta))
+        self.SigmaKi = self.Sigma.dot(self.Ki)
         self.diag_Sigma = np.diag(self.Sigma)
+
+        #TODO: use woodbury for inverse? We don't get Ki though :(
+        #tmp = self.K + np.diag(1./self.beta)
+        #L = GPy.util.linalg.jitchol(tmp)
+        #LiK,_ = GPy.util.linalg.dtrtrs(L,self.K, lower=1)
+        #self.Sigma_ = self.K - np.dot(LiK.T, LiK)
+        #LiLiK,_ = GPy.util.linalg.dtrtrs(L, LiK, lower=1, trans=1)
+        #self.SigmaKi_ = np.eye(self.num_data) - LiLiK.T
+
         self.mu = np.dot(self.Sigma, self.beta*self.Ytilde )
 
         #compute cavity means, vars (all at once!)
@@ -116,21 +126,20 @@ class classification(GPy.core.Model):
         dL_dYtilde = dA_dYtilde + dB_dYtilde + dC_dYtilde + dD_dYtilde
 
         #ok, now gradient for K
-        SigmaKi = self.Sigma.dot(self.Ki)
 
         #TODO: tidy this monster!
         tmp = (dA_dcav_vars + self.tilted.dH_dsigma2 + self.tilted.dZ_dsigma2/self.tilted.Z + dD_dcav_vars)/np.square(1 - self.diag_Sigma * self.beta)
         tmp += (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)* ((self.mu / self.diag_Sigma - self.Ytilde * self.beta)/np.square(1-self.diag_Sigma*self.beta))
         tmp += -(dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)/(1 - self.diag_Sigma * self.beta)*self.mu/self.diag_Sigma
 
-        dL_dK = np.dot(SigmaKi.T*tmp,SigmaKi)
+        dL_dK = np.dot(self.SigmaKi.T*tmp,self.SigmaKi)
 
         tmp = (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)/(1 - self.diag_Sigma * self.beta)
-        dL_dK += np.dot(SigmaKi.T, tmp)[:,None] * np.dot(self.Ki, self.mu)[None,:]
-
+        dL_dK += np.dot(self.SigmaKi.T, tmp)[:,None] * np.dot(self.Ki, self.mu)[None,:]
 
         dL_dK -= 0.5*self.Ki
-        dL_dK += 0.5 * self.Ki.dot((self.tilted.mean[:, None].dot(self.tilted.mean[None, :]) + np.diag(self.tilted.var)).dot(self.Ki))
+        tmp = self.Ki.dot(self.tilted.mean)
+        dL_dK += 0.5*(tmp[:,None]*tmp[None,:] + np.dot(self.Ki*self.tilted.var, self.Ki))
 
         return np.hstack((dL_dYtilde, dL_dbeta, self.kern.dK_dtheta(dL_dK, self.X)))
 

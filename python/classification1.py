@@ -1,9 +1,10 @@
 import numpy as np
 import pylab as pb
 import GPy
-import tilted
+from truncnorm import truncnorm
 from GPy.models.gradient_checker import GradientChecker
 from scipy.special import erf
+import tilted
 
 class classification(GPy.core.Model):
     def __init__(self, X, Y, kern):
@@ -188,6 +189,15 @@ if __name__=='__main__':
     #m.randomize();     m.checkgrad(verbose=True)
     m.optimize('bfgs', messages=1)#, max_iters=20, max_f_eval=20)
     m.plot()
+
+    mean, var = m._predict_raw(X)[:2]
+
+    pb.figure(2)
+    pb.clf()
+    pb.scatter(X[:, 0], Y, color='k', marker='x', s=40)
+    pb.scatter(X[:, 0], mean > 0, c='r', marker='o', facecolor='', edgecolor='r', s=50)
+
+
 #
 #     mm = GPy.models.GPClassification(X, Y[:, None], kernel=k.copy())
 #     mm.constrain_fixed('')

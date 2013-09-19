@@ -1,5 +1,7 @@
 import numpy as np
 import pylab as pb
+pb.ion()
+pb.close('all')
 import GPy
 from classification1 import classification
 

@@ -209,7 +209,7 @@ class classification(GPy.core.Model):
 
 if __name__=='__main__':
     pb.close('all')
-    N = 60
+    N = 20
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.zeros(N)

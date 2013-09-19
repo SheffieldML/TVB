@@ -33,7 +33,6 @@ class classification(GPy.core.Model):
         self.K = self.kern.K(self.X)
         self.Ki, self.L, _,self.K_logdet = GPy.util.linalg.pdinv(self.K)
         self.Sigma,_,_,_ = GPy.util.linalg.pdinv(self.Ki + np.diag(self.beta))
-        self.SigmaKi = self.Sigma.dot(self.Ki)
         self.diag_Sigma = np.diag(self.Sigma)
 
         #TODO: use woodbury for inverse? We don't get Ki though :(
@@ -116,8 +115,9 @@ class classification(GPy.core.Model):
         dD_dYtilde = np.dot(delta-dcav_means_dYtilde, ym/bv)
         dD_dcav_means = -ym / bv
         #TODO: tidy this monster!
-        dD_dbeta = -(-.5 * np.sum((dcav_vars_dbeta - delta / self.beta ** 2) / bv, 1)
-                    + np.sum(.5 * ym ** 2 * ((dcav_vars_dbeta - (delta / self.beta ** 2)) / bv ** 2)
+
+        dD_dbeta = (.5 * np.sum((dcav_vars_dbeta - delta / self.beta ** 2) / bv, 1)
+                    - np.sum(.5 * ym ** 2 * ((dcav_vars_dbeta - (delta / self.beta ** 2)) / bv ** 2)
                              + ym * dcav_means_dbeta / (1. / self.beta + self.cavity_vars), 1))
         dD_dcav_vars = 0.5 * (1-ym**2/bv)/bv
 
@@ -128,18 +128,31 @@ class classification(GPy.core.Model):
         #ok, now gradient for K
 
         #TODO: tidy this monster!
-        tmp = (dA_dcav_vars + self.tilted.dH_dsigma2 + self.tilted.dZ_dsigma2/self.tilted.Z + dD_dcav_vars)/np.square(1 - self.diag_Sigma * self.beta)
-        tmp += (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)* ((self.mu / self.diag_Sigma - self.Ytilde * self.beta)/np.square(1-self.diag_Sigma*self.beta))
-        tmp += -(dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)/(1 - self.diag_Sigma * self.beta)*self.mu/self.diag_Sigma
+        tmp0 = (dA_dcav_vars + self.tilted.dH_dsigma2 + self.tilted.dZ_dsigma2 / self.tilted.Z + dD_dcav_vars)
+        SigmaB = 1 - self.diag_Sigma * self.beta
+        mu_Sigma = self.mu / self.diag_Sigma
+        B = (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu / self.tilted.Z + dD_dcav_means)
+        tmp0 += B*(mu_Sigma - self.Ytilde*self.beta)
+        tmp0 /= SigmaB
+        tmp0 -= B*mu_Sigma
+        tmp0 /= SigmaB
+        tmp1 = (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu / self.tilted.Z + dD_dcav_means) / (1 - self.diag_Sigma * self.beta)
+        
+#         self.SigmaKi = self.Sigma.dot(self.Ki)
+#         dL_dK = np.dot(self.SigmaKi.T * tmp0, self.SigmaKi)
+#         dL_dK += np.dot(self.SigmaKi.T, tmp1)[:, None] * np.dot(self.Ki, self.mu)[None, :]
+#         dL_dK -= 0.5*self.Ki
+#         tmp2 = self.Ki.dot(self.tilted.mean)
+#         dL_dK += 0.5 * (tmp2[:, None] * tmp2[None, :] + np.dot(self.Ki * self.tilted.var, self.Ki))
 
-        dL_dK = np.dot(self.SigmaKi.T*tmp,self.SigmaKi)
+        dL_dK_inner = (tmp0 * self.Sigma).T + tmp1[:, None] * self.mu[None, :]
+        dL_dK_inner = self.Sigma.dot(dL_dK_inner)
+        dL_dK_inner += .5 * ((self.tilted.mean)[:, None] * self.tilted.mean[None, :] + delta * self.tilted.var)
 
-        tmp = (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu/self.tilted.Z + dD_dcav_means)/(1 - self.diag_Sigma * self.beta)
-        dL_dK += np.dot(self.SigmaKi.T, tmp)[:,None] * np.dot(self.Ki, self.mu)[None,:]
-
-        dL_dK -= 0.5*self.Ki
-        tmp = self.Ki.dot(self.tilted.mean)
-        dL_dK += 0.5*(tmp[:,None]*tmp[None,:] + np.dot(self.Ki*self.tilted.var, self.Ki))
+        dL_dK = np.dot(self.Ki, np.dot(dL_dK_inner, self.Ki))
+        dL_dK -= .5 * self.Ki
+#         assert np.allclose(dL_dK, dL_dK0)
+#         import ipdb;ipdb.set_trace()
 
         return np.hstack((dL_dYtilde, dL_dbeta, self.kern.dK_dtheta(dL_dK, self.X)))
 
@@ -196,7 +209,7 @@ class classification(GPy.core.Model):
 
 if __name__=='__main__':
     pb.close('all')
-    N = 20
+    N = 60
     X = np.random.rand(N)[:,None]
     X = np.sort(X,0)
     Y = np.zeros(N)

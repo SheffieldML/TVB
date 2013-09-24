@@ -7,9 +7,11 @@ from scipy.special import erf
 import tilted
 
 class classification(GPy.core.Model):
-    def __init__(self, X, Y, kern):
+    def __init__(self, X, Y, kern=None):
         self.X = X
         self.Y = Y
+        if kern is None:
+            kern = GPy.kern.rbf(X.shape[1]) + GPy.kern.white(X.shape[1])
         self.kern = kern
         self.Y_sign = np.where(Y>0,1,-1)
         self.num_data, self.input_dim = self.X.shape
@@ -168,6 +170,10 @@ class classification(GPy.core.Model):
         var = Kxx - np.sum(np.square(tmp), 0)
         return mu, var
 
+    def predict(self, Xnew):
+        mu, var = self._predict_raw(Xnew)
+        return 0.5*(1+erf(mu/np.sqrt(2.*var)))
+
 
     def plot_f(self):
         if self.X.shape[1]==1:
@@ -195,8 +201,7 @@ class classification(GPy.core.Model):
         elif self.X.shape[1]==2:
             pb.figure()
             Xtest,xx,yy, xymin, xymax = GPy.util.plot.x_frame2D(self.X)
-            mu, var = self._predict_raw(Xtest)
-            p =0.5*(1+erf(mu/np.sqrt(2.*var)))
+            p = self.predict(Xtest)
             c = pb.contour(xx,yy,p.reshape(*xx.shape), [0.1, 0.25, 0.5, 0.75, 0.9], colors='k')
             pb.clabel(c)
             i1 = self.Y==1

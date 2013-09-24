@@ -1,14 +1,12 @@
-\documentclass{article} % For aTeX2e
-%\usepackage{nips12submit_e}
-\usepackage[numbers]{natbib}
+\documentclass[twoside]{article}
+\usepackage{aistats2014}
+%\usepackage[accepted]{aistats2014}
+\usepackage{natbib}
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usepackage{times}
 \usepackage{graphicx}
-\usepackage{subfigure}
+%\usepackage{subfigure}
 
-\input{definitions}
-\input{notationDef}
 
 \newcommand{\noti}{{\backslash i}}
 \renewcommand{\d}{\,\text d}
@@ -16,7 +14,29 @@
 
 \global\long\def\pseudotargetScalar{\tilde y}
 
+
+
 \begin{document}
+
+\input{definitions}
+\input{notationDef}
+
+%For shorter title/authors
+%\runningtitle{I use this title instead because the last one was very long}
+%\runningauthor{Surname 1, Surname 2, Surname 3, ...., Surname n}
+
+\twocolumn[
+
+\aistatstitle{Variational EP}
+
+\aistatsauthor{ James Hensman \And Max Zweissele \And Neil D. Lawrence }
+
+\aistatsaddress{ Univeristy of Sheffield \And  Univeristy of Sheffield \And Univeristy of Sheffield } ]
+
+\begin{abstract}
+We present a novel method for approximate inference. Using some of the constructs from Expectation Propagation (EP), we derive a lower bound of the marginal likelihood in a similar fashion to Variational Bayes (VB). Maximisation of this lower bound minimises {\em two} Kullback-Leibler divergences, with the tilted distribution sitting between the true posterior and the approximation. We apply the method to Gaussian Process classification with excellent results. 
+\end{abstract}
+
 \section{The Cavity distribution}
 The cavity distribution is defined as
 $$

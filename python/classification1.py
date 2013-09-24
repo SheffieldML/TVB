@@ -15,10 +15,11 @@ class classification(GPy.core.Model):
         self.kern = kern
         self.Y_sign = np.where(Y>0,1,-1)
         self.num_data, self.input_dim = self.X.shape
+        self.no_K_grads_please = False
         GPy.core.Model.__init__(self)
 
         self.Ytilde = np.zeros(self.num_data)
-        self.beta = np.zeros(self.num_data) + 1
+        self.beta = np.zeros(self.num_data) + 0.1
 
         self.tilted = tilted.Heaviside(self.Y)
 
@@ -128,35 +129,30 @@ class classification(GPy.core.Model):
         dL_dYtilde = dA_dYtilde + dB_dYtilde + dC_dYtilde + dD_dYtilde
 
         #ok, now gradient for K
+        if self.no_K_grads_please:
+            dL_dtheta = np.zeros(self.kern.num_params_transformed())
+        else:
 
-        #TODO: tidy this monster!
-        tmp0 = (dA_dcav_vars + self.tilted.dH_dsigma2 + self.tilted.dZ_dsigma2 / self.tilted.Z + dD_dcav_vars)
-        SigmaB = 1 - self.diag_Sigma * self.beta
-        mu_Sigma = self.mu / self.diag_Sigma
-        B = (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu / self.tilted.Z + dD_dcav_means)
-        tmp0 += B*(mu_Sigma - self.Ytilde*self.beta)
-        tmp0 /= SigmaB
-        tmp0 -= B*mu_Sigma
-        tmp0 /= SigmaB
-        tmp1 = (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu / self.tilted.Z + dD_dcav_means) / (1 - self.diag_Sigma * self.beta)
-        
-#         self.SigmaKi = self.Sigma.dot(self.Ki)
-#         dL_dK = np.dot(self.SigmaKi.T * tmp0, self.SigmaKi)
-#         dL_dK += np.dot(self.SigmaKi.T, tmp1)[:, None] * np.dot(self.Ki, self.mu)[None, :]
-#         dL_dK -= 0.5*self.Ki
-#         tmp2 = self.Ki.dot(self.tilted.mean)
-#         dL_dK += 0.5 * (tmp2[:, None] * tmp2[None, :] + np.dot(self.Ki * self.tilted.var, self.Ki))
+            #TODO: tidy this monster!
+            tmp0 = (dA_dcav_vars + self.tilted.dH_dsigma2 + self.tilted.dZ_dsigma2 / self.tilted.Z + dD_dcav_vars)
+            SigmaB = 1 - self.diag_Sigma * self.beta
+            mu_Sigma = self.mu / self.diag_Sigma
+            B = (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu / self.tilted.Z + dD_dcav_means)
+            tmp0 += B*(mu_Sigma - self.Ytilde*self.beta)
+            tmp0 /= SigmaB
+            tmp0 -= B*mu_Sigma
+            tmp0 /= SigmaB
+            tmp1 = (dA_dcav_means + self.tilted.dH_dmu + self.tilted.dZ_dmu / self.tilted.Z + dD_dcav_means) / (1 - self.diag_Sigma * self.beta)
 
-        dL_dK_inner = (tmp0 * self.Sigma).T + tmp1[:, None] * self.mu[None, :]
-        dL_dK_inner = self.Sigma.dot(dL_dK_inner)
-        dL_dK_inner += .5 * ((self.tilted.mean)[:, None] * self.tilted.mean[None, :] + delta * self.tilted.var)
+            dL_dK_inner = (tmp0 * self.Sigma).T + tmp1[:, None] * self.mu[None, :]
+            dL_dK_inner = self.Sigma.dot(dL_dK_inner)
+            dL_dK_inner += .5 * ((self.tilted.mean)[:, None] * self.tilted.mean[None, :] + delta * self.tilted.var)
 
-        dL_dK = np.dot(self.Ki, np.dot(dL_dK_inner, self.Ki))
-        dL_dK -= .5 * self.Ki
-#         assert np.allclose(dL_dK, dL_dK0)
-#         import ipdb;ipdb.set_trace()
+            dL_dK = np.dot(self.Ki, np.dot(dL_dK_inner, self.Ki))
+            dL_dK -= .5 * self.Ki
+            dL_dtheta = self.kern.dK_dtheta(dL_dK, self.X)
 
-        return np.hstack((dL_dYtilde, dL_dbeta, self.kern.dK_dtheta(dL_dK, self.X)))
+        return np.hstack((dL_dYtilde, dL_dbeta, dL_dtheta))
 
     def _predict_raw(self, Xnew):
         """Predict the underlying GP function"""

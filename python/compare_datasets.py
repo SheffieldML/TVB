@@ -77,7 +77,7 @@ def compare(Xtrain, Ytrain, Xtest, Ytest):
 #loop through all the data...
 for dn in dataset_names[3:]: # first 3 keys are meta-data from the mat file
     if dn=='benchmarks': continue
-    if not (dn=='banana'): continue
+    if not (dn=='flare_solar'): continue
     print dn
     failures = 0
 
@@ -88,26 +88,12 @@ for dn in dataset_names[3:]: # first 3 keys are meta-data from the mat file
     train_inds = d[dn]['train'][0,0] -1 # subtract 1 to get offset (proper!) indexing
     test_inds = d[dn]['test'][0,0] -1 # subtract 1 to get offset (proper!) indexing
 
-    results = par_map(compare,
-            [X[tr_i] for tr_i in train_inds],
-            [Y[tr_i] for tr_i in train_inds],
-            [X[te_i] for te_i in test_inds],
-            [Y[te_i] for te_i in test_inds])
+#    results = par_map(compare,
+#            [X[tr_i] for tr_i in train_inds],
+#            [Y[tr_i] for tr_i in train_inds],
+#            [X[te_i] for te_i in test_inds],
+#            [Y[te_i] for te_i in test_inds])
 
     results = np.array(results)
     np.savetxt(dn+'raw_results', results)
-    #write the results to a file
-    #f = file(dn+'_results.txt','w')
-    #f.write('errors:\n')
-    #f.write('varEP:' + str(np.mean(my_errors)) +' +/- ' + str(np.std(my_errors)) + '\n')
-    #f.write('EP (var_EP kern):' + str(np.mean(EP_errors)) +' +/- ' + str(np.std(EP_errors)) + '\n')
-    #f.write('EP (pseudo-EM):' + str(np.mean(EPopt_errors)) +' +/- ' + str(np.std(EPopt_errors)) + '\n')
-    #f.write('varEP (EP kern):' + str(np.mean(my_errors2)) +' +/- ' + str(np.std(my_errors2)) + '\n')
-    #f.write('\nnlps:\n')
-    #f.write('varEP:' + str(np.mean(my_nlps)) +' +/- ' + str(np.std(my_nlps)) + '\n')
-    #f.write('EP (var_EP kern):' + str(np.mean(EP_nlps)) +' +/- ' + str(np.std(EP_nlps)) + '\n')
-    #f.write('EP (pseudo-EM):' + str(np.mean(EPopt_nlps)) +' +/- ' + str(np.std(EPopt_nlps)) + '\n')
-    #f.write('varEP (EP kern):' + str(np.mean(my_nlps2)) +' +/- ' + str(np.std(my_nlps2)) + '\n')
-    #f.write('\nfailures: ' + str(failures))
-    #f.close()
 

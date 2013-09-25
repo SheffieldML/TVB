@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib
-matplotlib.use('pdf')
+#matplotlib.use('pdf')
 import pylab as pb
+pb.ion()
 import os
 from scipy import stats
 
@@ -16,7 +17,7 @@ x = np.arange(len(data))
 width=0.35
 
 pb.figure()
-error_kw = {'linewidth':1.2, 'color':'k'}
+error_kw = {'elinewidth':1.2, 'ecolor':'k', 'capsize':5, 'mew':1.2}
 pb.bar(x, means[:,1], yerr=stds[:,1], width=width, color='b', label='var_EP', error_kw=error_kw)
 pb.bar(x+width, means[:,5], yerr=stds[:,5], color='r', width=width, label='EP', error_kw=error_kw)
 pb.legend()

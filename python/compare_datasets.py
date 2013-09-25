@@ -34,6 +34,7 @@ dataset_names = np.sort(np.array(dataset_names, dtype=np.str))
 
 #define a function that can compare the methods
 def compare(Xtrain, Ytrain, Xtest, Ytest):
+
     m = classification(Xtrain, Ytrain)
     m.optimize('bfgs')#, messages=0, bfgs_factor=1e8)
 
@@ -85,9 +86,9 @@ def compare(Xtrain, Ytrain, Xtest, Ytest):
 
 
 #loop through all the data...
-for dn in dataset_names[3:]: # first 3 keys are meta-data from the mat file
+for dn in dataset_names:
+    if dn[:2]=='__':continue # first 3 keys are meta-data from the mat file
     if dn=='benchmarks': continue
-    if not (dn=='flare_solar'): continue
     if dn+'raw_results' in os.listdir('.'):
         print dn, 'is done already'
         continue
@@ -100,11 +101,18 @@ for dn in dataset_names[3:]: # first 3 keys are meta-data from the mat file
     train_inds = d[dn]['train'][0,0] -1 # subtract 1 to get offset (proper!) indexing
     test_inds = d[dn]['test'][0,0] -1 # subtract 1 to get offset (proper!) indexing
 
-#    results = par_map(compare,
-#            [X[tr_i] for tr_i in train_inds],
-#            [Y[tr_i] for tr_i in train_inds],
-#            [X[te_i] for te_i in test_inds],
-#            [Y[te_i] for te_i in test_inds])
+    #cut duplicates from the training set...
+    train_inds = [np.unique(ti) for ti in train_inds]
+
+    #onyl do 20 folds, not 100 (for now) TODO: remove
+    train_inds = train_inds[:20]
+    test_inds = test_inds[:20]
+
+    results = par_map(compare,
+            [X[tr_i] for tr_i in train_inds],
+            [Y[tr_i] for tr_i in train_inds],
+            [X[te_i] for te_i in test_inds],
+            [Y[te_i] for te_i in test_inds])
 
     results = np.array(results)
     np.savetxt(dn+'raw_results', results)

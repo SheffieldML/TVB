@@ -4,24 +4,26 @@ from scipy.io import loadmat
 import GPy
 from classification1 import classification
 import sys
+import os
 
 #set up parallel stuff
 from IPython import parallel
 try:
     c = parallel.Client()
     dv = c.direct_view()
-    dv.execute('import GPy')
-    dv.execute('from classifiaction1 import parallel')
+    dv.execute('import GPy', block=True)
+    dv.execute('import numpy as np', block=True)
+    dv.execute('from classification1 import classification', block=True)
     DO_PARALLEL = True
 except:
     DO_PARALLEL = False
-
-DO_PARALLEL = False
+    print "parallel init failed"
 
 def par_map(f, *seq):
     if DO_PARALLEL:
         return dv.map(f, *seq, block=True)
     else:
+        print "parallel diabled: this will be slow!"
         return map(f,*seq)
 
 d = loadmat('benchmarks.mat')
@@ -36,6 +38,7 @@ def compare(Xtrain, Ytrain, Xtest, Ytest):
     m.optimize('bfgs')#, messages=0, bfgs_factor=1e8)
 
     predictions = m.predict(Xtest)
+    predictions = np.clip(predictions, 1e-6, 1.-1e-6)
     truth = Ytest.flatten()
     my_error = 1. - np.mean(truth==(predictions>0.5))
     my_nlp = - np.mean(truth*np.log(predictions) + (1-truth)*np.log(1-predictions))
@@ -43,43 +46,52 @@ def compare(Xtrain, Ytrain, Xtest, Ytest):
     ##build an EP model, with the same link and kernel parameters
     link = GPy.likelihoods.noise_models.gp_transformations.Heaviside()
     lik = GPy.likelihoods.binomial(link)
-    m_ep1 = GPy.models.GPClassification(X[tr_i],likelihood=GPy.likelihoods.EP(Y[tr_i].reshape(-1,1), lik), kernel = m.kern.copy())
-    m_ep1.update_likelihood_approximation()
-    predictions = m_ep1.predict(X[te_i])[0].flatten()
-    EP1_error = 1. - np.mean(truth==(predictions>0.5))
-    EP1_nlp = - np.mean(truth*np.log(predictions) + (1-truth)*np.log(1-predictions))
+    m_ep1 = GPy.models.GPClassification(Xtrain,likelihood=GPy.likelihoods.EP(Ytrain.reshape(-1,1), lik), kernel = m.kern.copy())
+    try:
+        m_ep1.update_likelihood_approximation()
+        predictions = m_ep1.predict(Xtest)[0].flatten()
+        predictions = np.clip(predictions, 1e-6, 1.-1e-6)
+        EP_errorX = 1. - np.mean(truth==(predictions>0.5))
+        EP_nlpX = - np.mean(truth*np.log(predictions) + (1-truth)*np.log(1-predictions))
+    except:
+        EP_errorX = np.nan
+        EP_nlpX = np.nan
 
     #now optimize against the ep approximation to the marg. lik.
-    m_ep2 = GPy.models.GPClassification(X[tr_i],likelihood=GPy.likelihoods.EP(Y[tr_i].reshape(-1,1), lik), kernel = GPy.kern.rbf(X.shape[1]) + GPy.kern.white(X.shape[1]))
+    m_ep2 = GPy.models.GPClassification(Xtrain,likelihood=GPy.likelihoods.EP(Ytrain.reshape(-1,1), lik), kernel = GPy.kern.rbf(Xtrain.shape[1]) + GPy.kern.white(Xtrain.shape[1]))
     try:
         m_ep2.pseudo_EM()
     except:
         #psuedo_EM failed...
-        return my_error, my_nlp, EP1_error, EP1_nlp, np.nan, np.nan, np.nan, np.nan
-    predictions = m_ep2.predict(X[te_i])[0].flatten()
+        return my_error, my_nlp, EP_errorX, EP_nlpX, np.nan, np.nan, np.nan, np.nan
+    predictions = m_ep2.predict(Xtest)[0].flatten()
+    predictions = np.clip(predictions, 1e-6, 1.-1e-6)
     EP_error = 1. - np.mean(truth==(predictions>0.5))
     EP_nlp = - np.mean(truth*np.log(predictions) + (1-truth)*np.log(1-predictions))
 
-    #now build varEP with the kren fixed to the EP solution
+    #now build varEP with the kern fixed to the EP solution
     k = m_ep2.kern.copy()
     k.constrain_fixed('')
-    m2 = classification(X[tr_i], Y[tr_i], k)
+    m2 = classification(Xtrain, Ytrain, k)
     m2.no_K_grads_please = True # don;t compute the gradient wrt kern. params to save time
     m2.optimize('bfgs', messages=0, bfgs_factor=1e7)
 
-    predictions = m2.predict(X[te_i])
-    var_EP1_error = 1. - np.mean(truth==(predictions>0.5))
-    var_EP1_nlp = - np.mean(truth*np.log(predictions) + (1-truth)*np.log(1-predictions))
+    predictions = m2.predict(Xtest)
+    predictions = np.clip(predictions, 1e-6, 1.-1e-6)
+    var_EP_errorX = 1. - np.mean(truth==(predictions>0.5))
+    var_EP_nlpX = - np.mean(truth*np.log(predictions) + (1-truth)*np.log(1-predictions))
 
-    return my_error, my_nlp, EP1_error, EP1_nlp, EP_error, EP_nlp, var_EP1_error, var_EP1_nlp
+    return my_error, my_nlp, EP_errorX, EP_nlpX, EP_error, EP_nlp, var_EP_errorX, var_EP_nlpX
 
 
 #loop through all the data...
 for dn in dataset_names[3:]: # first 3 keys are meta-data from the mat file
     if dn=='benchmarks': continue
-    if not (dn=='banana'): continue
-    print dn
-    failures = 0
+    #if (dn=='banana'): continue # I did banana already
+    if dn+'raw_results' in os.listdir('.'):
+        print dn, 'is done already'
+        continue
+    print 'doing', dn
 
     #extract the data matrices from the structure. The extra [0,0] is a mystery to me!
     X = d[dn]['x'][0,0]

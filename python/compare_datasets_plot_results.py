@@ -20,7 +20,14 @@ pb.figure()
 error_kw = {'elinewidth':1.2, 'ecolor':'k', 'capsize':5, 'mew':1.2}
 pb.bar(x, means[:,1], yerr=stds[:,1], width=width, color='b', label='var_EP', error_kw=error_kw)
 pb.bar(x+width, means[:,5], yerr=stds[:,5], color='r', width=width, label='EP', error_kw=error_kw)
-pb.legend()
 pb.xticks(x+width,[fn.split('raw')[0] for fn in fnames])
-pb.savefig('nlps.pdf')
 
+for xx, m, s in zip(x, means[:,1], stds[:,1]):
+    pb.text(xx+0.5*width, 1.0*(m+s), '%.3f'%m,ha='center', va='bottom')
+for xx, m, s in zip(x+width, means[:,5], stds[:,5]):
+    pb.text(xx+0.5*width, 1.0*(m+s), '%.3f'%m,ha='center', va='bottom')
+
+#pb.legend(loc=0)
+pb.ylim(0,0.7)
+
+pb.savefig('nlps.pdf')

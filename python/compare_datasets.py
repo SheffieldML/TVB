@@ -89,6 +89,7 @@ def compare(Xtrain, Ytrain, Xtest, Ytest):
 for dn in dataset_names:
     if dn[:2]=='__':continue # first 3 keys are meta-data from the mat file
     if dn=='benchmarks': continue
+    if dn=='flare_solar': continue #pita
     if dn+'raw_results' in os.listdir('.'):
         print dn, 'is done already'
         continue

@@ -35,7 +35,8 @@ class classification(GPy.core.Model):
         # and p(f | \tilde y) in ours
         self.K = self.kern.K(self.X)
         self.Ki, self.L, _,self.K_logdet = GPy.util.linalg.pdinv(self.K)
-        self.Sigma,_,_,_ = GPy.util.linalg.pdinv(self.Ki + np.diag(self.beta))
+        self.Sigma_inv = self.Ki + np.diag(self.beta)
+        self.Sigma,_,_,_ = GPy.util.linalg.pdinv(self.Sigma_inv)
         self.diag_Sigma = np.diag(self.Sigma)
 
         #TODO: use woodbury for inverse? We don't get Ki though :(
@@ -117,7 +118,6 @@ class classification(GPy.core.Model):
         ym = self.Ytilde - self.cavity_means
         dD_dYtilde = np.dot(delta-dcav_means_dYtilde, ym/bv)
         dD_dcav_means = -ym / bv
-        #TODO: tidy this monster!
 
         dD_dbeta = (.5 * np.sum((dcav_vars_dbeta - delta / self.beta ** 2) / bv, 1)
                     - np.sum(.5 * ym ** 2 * ((dcav_vars_dbeta - (delta / self.beta ** 2)) / bv ** 2)
@@ -206,6 +206,50 @@ class classification(GPy.core.Model):
             pb.plot(self.X[:,0][i2], self.X[:,1][i2], 'wo', mew=2, mec='b')
 
 
+    def natgrad(self):
+        grads = self._log_likelihood_gradients()
+        dL_dYtilde = grads[:self.num_data]
+        dL_dbeta = grads[self.num_data:2*self.num_data]
+
+        ll_old = self.log_likelihood()
+        beta_old = self.beta.copy()
+        Ytilde_old = self.Ytilde.copy()
+
+        steplength = 1e-2
+        for i in range(100):
+
+            #which!?
+            beta_new = self.beta + steplength*2.*np.diag(np.dot(self.Sigma_inv*dL_dbeta, self.Sigma_inv))
+            beta_new = np.clip(beta_new, 1e-3, 1e3)
+
+
+            By_new = self.beta*self.Ytilde + steplength*np.dot(self.Sigma_inv/self.beta.reshape(-1,1),dL_dYtilde)
+            y_new = By_new/beta_new
+
+            self.Ytilde = y_new
+            self.beta = beta_new
+            self._set_params(self._get_params())
+
+            ll_new = self.log_likelihood()
+            if (ll_new<ll_old) or np.isnan(ll_new):
+                #step failed: reduce steplength and try again
+                self.beta = beta_old
+                self.Ytilde = Ytilde_old
+                steplength /= 2.
+
+                print i, ll_new, '(failed, reducing step length)'
+            else:
+                #sucess!
+                print i, ll_new
+                if (ll_new - ll_old) < 1e-6:
+                    break # terminate
+                ll_old = self.log_likelihood()
+                beta_old = self.beta.copy()
+                Ytilde_old = self.Ytilde.copy()
+
+                steplength *= 1.1
+
+
 
 
 if __name__=='__main__':
@@ -222,8 +266,8 @@ if __name__=='__main__':
     m = classification(X, Y, k.copy())
     m.constrain_positive('beta')
     #m.randomize();     m.checkgrad(verbose=True)
-    m.optimize('bfgs', messages=1)#, max_iters=20, max_f_eval=20)
-    m.plot()
+    #m.optimize('bfgs', messages=1)#, max_iters=20, max_f_eval=20)
+    #m.plot()
 
     mean, var = m._predict_raw(X)[:2]
 

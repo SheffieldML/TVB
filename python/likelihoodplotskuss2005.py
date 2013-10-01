@@ -4,7 +4,8 @@ Created on 12 Sep 2013
 @author: maxz, James Hensman
 '''
 import numpy as np
-from classification1 import classification
+from classification1 import classification as class1
+from classification2 import classification as class2
 import GPy
 import sys
 import pylab as pb
@@ -28,7 +29,7 @@ if __name__ == '__main__':
     kern = GPy.kern.rbf(X.shape[1]) + GPy.kern.white(X.shape[1])
 
 
-    m = classification(X, Y, kern)
+    m = class1(X, Y, kern)
     m.no_K_grads_please = True
     def set_param_and_evaluate(l, a):
         # m.kern['rbf_len'] = np.exp(l)
@@ -43,7 +44,7 @@ if __name__ == '__main__':
     surface_func = np.vectorize(set_param_and_evaluate)
     Z = surface_func(l, a)
 
-    m = classification(X, Y, kern)
+    m = class2(X, Y, kern)
     m.no_K_grads_please = True
     def set_param_and_evaluate(l, a):
         # m.kern['rbf_len'] = np.exp(l)
@@ -54,7 +55,7 @@ if __name__ == '__main__':
         m.randomize()
         print "Optimizing alt: {:.2} {:.2}".format(l, a)
         m.optimize('bfgs', messages=0)#, bfgs_factor=1e20)
-        return m.alternative_log_likelihood()
+        return m.log_likelihood()
     surface_func = np.vectorize(set_param_and_evaluate)
     Z_alt = surface_func(l, a)
 

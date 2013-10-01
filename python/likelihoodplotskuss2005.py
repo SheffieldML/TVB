@@ -19,11 +19,12 @@ if __name__ == '__main__':
     Y = np.where(labels == 'b', 0, 1)[:, None].flatten()
 
     #cut some data out ( as kuss)
-    X = X[:200]
-    Y = Y[:200]
+    N = 10
+    X = X[:N]
+    Y = Y[:N]
 
-    gridsize = 10  # x gridsipyze
-    l, a = np.meshgrid(np.linspace(0, 5, gridsize), np.linspace(0, 5, gridsize))
+    gridsize = 6  # x gridsipyze
+    l, a = np.meshgrid(np.linspace(0, 5, gridsize), np.linspace(0, 6, gridsize))
     kern = GPy.kern.rbf(X.shape[1]) + GPy.kern.white(X.shape[1])
 
 
@@ -38,9 +39,24 @@ if __name__ == '__main__':
         m.randomize()
         print "Optimizing: {:.2} {:.2}".format(l, a)
         m.optimize('bfgs', messages=0)#, bfgs_factor=1e20)
-        return m.alternative_log_likelihood()
+        return m.log_likelihood()
     surface_func = np.vectorize(set_param_and_evaluate)
     Z = surface_func(l, a)
+
+    m = classification(X, Y, kern)
+    m.no_K_grads_please = True
+    def set_param_and_evaluate(l, a):
+        # m.kern['rbf_len'] = np.exp(l)
+        # m.kern['rbf_var'] = np.exp(a)
+        m.constrain_fixed('rbf_len', np.exp(l))
+        m.constrain_fixed('rbf_var', np.exp(a))
+        m.constrain_fixed('white', 1.)
+        m.randomize()
+        print "Optimizing alt: {:.2} {:.2}".format(l, a)
+        m.optimize('bfgs', messages=0)#, bfgs_factor=1e20)
+        return m.alternative_log_likelihood()
+    surface_func = np.vectorize(set_param_and_evaluate)
+    Z_alt = surface_func(l, a)
 
     #link = GPy.likelihoods.noise_models.gp_transformations.Heaviside()
     link = GPy.likelihoods.noise_models.gp_transformations.Probit()
@@ -57,16 +73,21 @@ if __name__ == '__main__':
 
     c = pb.contour(l,a,Z, 10)
     pb.clabel(c)
-    pb.colorbar()
+    #pb.colorbar()
+    #pb.figure()
+    #pb.contour(l,a,np.exp(Z))
+    #pb.colorbar()
+
+
     pb.figure()
-    pb.contour(l,a,np.exp(Z))
-    pb.colorbar()
+    c = pb.contour(l,a,Z_alt, 10)
+    pb.clabel(c)
 
     pb.figure()
     c = pb.contour(l,a,Z_ep, 10)
     pb.clabel(c)
-    pb.colorbar()
-    pb.figure()
-    pb.contour(l,a,np.exp(Z_ep))
-    pb.colorbar()
+    #pb.colorbar()
+    #pb.figure()
+    #pb.contour(l,a,np.exp(Z_ep))
+    #pb.colorbar()
 

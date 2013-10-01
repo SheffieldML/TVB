@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib
-#matplotlib.use('pdf')
+matplotlib.use('pdf')
 import pylab as pb
-pb.ion()
+#pb.ion()
 import os
 from scipy import stats
 

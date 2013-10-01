@@ -36,7 +36,10 @@ dataset_names = np.sort(np.array(dataset_names, dtype=np.str))
 def compare(Xtrain, Ytrain, Xtest, Ytest):
 
     m = classification(Xtrain, Ytrain)
-    m.optimize('bfgs')#, messages=0, bfgs_factor=1e8)
+    try:
+        m.optimize('bfgs')#, messages=0, bfgs_factor=1e8)
+    except:
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
     predictions = m.predict(Xtest)
     predictions = np.clip(predictions, 1e-6, 1.-1e-6)
@@ -89,7 +92,6 @@ def compare(Xtrain, Ytrain, Xtest, Ytest):
 for dn in dataset_names:
     if dn[:2]=='__':continue # first 3 keys are meta-data from the mat file
     if dn=='benchmarks': continue
-    if dn=='flare_solar': continue #pita
     if dn+'raw_results' in os.listdir('.'):
         print dn, 'is done already'
         continue

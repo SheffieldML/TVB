@@ -22,7 +22,7 @@ if __name__ == '__main__':
     X = X[:200]
     Y = Y[:200]
 
-    gridsize = 12  # x gridsipyze
+    gridsize = 10  # x gridsipyze
     l, a = np.meshgrid(np.linspace(0, 5, gridsize), np.linspace(0, 5, gridsize))
     kern = GPy.kern.rbf(X.shape[1]) + GPy.kern.white(X.shape[1])
 
@@ -38,7 +38,7 @@ if __name__ == '__main__':
         m.randomize()
         print "Optimizing: {:.2} {:.2}".format(l, a)
         m.optimize('bfgs', messages=0)#, bfgs_factor=1e20)
-        return m.log_likelihood()
+        return m.alternative_log_likelihood()
     surface_func = np.vectorize(set_param_and_evaluate)
     Z = surface_func(l, a)
 

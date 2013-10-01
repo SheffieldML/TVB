@@ -64,6 +64,21 @@ class classification(GPy.core.Model):
                ['beta%i'%i for i in range(self.num_data)] +\
                self.kern._get_param_names_transformed()
 
+    def alternative_log_likelihood(self):
+        #ignore log 2 pi terms, they cancel.
+
+        #expectation of log prior under q
+        tmp, _ = GPy.util.linalg.dtrtrs(self.L,self.tilted.mean, lower=1)
+        A = -0.5*self.K_logdet -0.5*np.sum(np.square(tmp)) - 0.5*np.sum(np.diag(self.Ki)*self.tilted.var)
+
+        #expectation of the (negative) log cavity
+        B = 0.5*np.sum(np.log(self.cavity_vars)) + 0.5*np.sum(np.square(self.cavity_means - self.tilted.mean)/self.cavity_vars) + 0.5*np.sum(self.tilted.var/self.cavity_vars)
+
+        #Z
+        C = np.log(self.tilted.Z).sum()
+        return A + B + C
+
+
     def log_likelihood(self):
         #expectation of log pseudo-likelihood times prior under q
         A = -self.num_data*np.log(2*np.pi) + 0.5*np.log(self.beta).sum() - 0.5*self.K_logdet

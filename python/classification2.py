@@ -153,8 +153,6 @@ class classification(GPy.core.Model):
             dL_dK += (np.dot(self.Ki, self.mu)[:,None] * (dL_dcav_means*self.cavity_vars/self.diag_Sigma)[None,:]).dot(KiSigma.T)
 
             #the 'direct' part
-
-            #A = -0.5*self.K_logdet -0.5*np.sum(np.square(tmp)) - 0.5*np.sum(np.diag(self.Ki)*self.tilted.var)
             dL_dK -= .5 * self.Ki # for the log det.
             Kim = np.dot(self.Ki, self.tilted.mean)
             dL_dK += 0.5*Kim[:,None]*Kim[None,:]

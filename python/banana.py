@@ -3,7 +3,7 @@ import pylab as pb
 pb.ion()
 pb.close('all')
 import GPy
-from classification1 import classification
+from classification2 import classification
 
 d = np.loadtxt('../data/banana-5-1tra.dat', skiprows=7, delimiter=',')
 d = d[:300]

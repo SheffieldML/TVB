@@ -108,18 +108,15 @@ class classification(GPy.core.Model):
         tmp = self.Sigma / self.diag_Sigma
         dcav_means_dbeta += (tmp*(self.Ytilde[:,None] - self.mu[:,None]) + tmp**2*self.mu - np.diag(self.Ytilde))*self.cavity_vars
 
+        #first compute gradietn wrt cavity parameters, then chain
         #A
-
         dA_dq_means = -np.dot(self.Ki, self.tilted.mean)
         dA_dq_vars = -0.5*np.diag(self.Ki)
         dA_dcav_means = dA_dq_vars*self.tilted.dvar_dmu + dA_dq_means*self.tilted.dmean_dmu
         dA_dcav_vars = dA_dq_vars*self.tilted.dvar_dsigma2
         dA_dcav_vars += dA_dq_means*self.tilted.dmean_dsigma2
-        dA_dbeta = np.dot(dcav_means_dbeta, dA_dcav_means) + np.dot(dcav_vars_dbeta, dA_dcav_vars)
-        dA_dYtilde = np.dot(dcav_means_dYtilde, dA_dcav_means)
 
         #B
-        #B = 0.5*np.sum(np.log(self.cavity_vars)) + 0.5*np.sum(np.square(self.cavity_means - self.tilted.mean)/self.cavity_vars) + 0.5*np.sum(self.tilted.var/self.cavity_vars)
         dB_dq_means = (self.tilted.mean - self.cavity_means)/self.cavity_vars
         dB_dq_vars = 0.5/self.cavity_vars
         dB_dcav_vars = 0.5/self.cavity_vars - 0.5*(np.square(self.cavity_means - self.tilted.mean) + self.tilted.var)/np.square(self.cavity_vars)
@@ -127,24 +124,43 @@ class classification(GPy.core.Model):
         dB_dcav_vars += dB_dq_vars*self.tilted.dvar_dsigma2
         dB_dcav_means = (self.cavity_means - self.tilted.mean)/self.cavity_vars
         dB_dcav_means += dB_dq_vars*self.tilted.dvar_dmu + dB_dq_means*self.tilted.dmean_dmu
-        dB_dbeta = np.dot(dcav_means_dbeta, dB_dcav_means) + np.dot(dcav_vars_dbeta, dB_dcav_vars)
-        dB_dYtilde = np.dot(dcav_means_dYtilde, dB_dcav_means)
 
         #C
-        dC_dbeta = np.dot(dcav_means_dbeta, self.tilted.dZ_dmu/self.tilted.Z) + np.dot(dcav_vars_dbeta, self.tilted.dZ_dsigma2/self.tilted.Z)
-        dC_dYtilde = np.dot(dcav_means_dYtilde, self.tilted.dZ_dmu/self.tilted.Z)
+        dC_dcav_means = self.tilted.dZ_dmu/self.tilted.Z
+        dC_dcav_vars = self.tilted.dZ_dsigma2/self.tilted.Z
+
 
         #sum gradients from all the different parts
-        dL_dbeta = dA_dbeta + dB_dbeta + dC_dbeta
-        dL_dYtilde = dA_dYtilde + dB_dYtilde + dC_dYtilde
+        dL_dcav_vars = dA_dcav_vars + dB_dcav_vars + dC_dcav_vars
+        dL_dcav_means = dA_dcav_means + dB_dcav_means + dC_dcav_means
+
+        dL_dbeta = np.dot(dcav_means_dbeta, dL_dcav_means) + np.dot(dcav_vars_dbeta, dL_dcav_vars)
+        dL_dYtilde = np.dot(dcav_means_dYtilde, dL_dcav_means)
 
         #ok, now gradient for K
         if self.no_K_grads_please:
             dL_dtheta = np.zeros(self.kern.num_params_transformed())
         else:
+            #the symmetric parts
+            tmp = dL_dcav_vars*np.square(self.cavity_vars/self.diag_Sigma)
+            tmp += dL_dcav_means*(self.cavity_means - self.mu)*self.cavity_vars/np.square(self.diag_Sigma)
+            KiSigma = np.dot(self.Ki, self.Sigma)
 
-            #TODO!
-            dL_dtheta = np.zeros(self.kern.num_params_transformed())
+            tmp = KiSigma*tmp
+            dL_dK = np.dot(tmp, KiSigma.T)
+
+            #the non-symmetric parts
+            dL_dK += (np.dot(self.Ki, self.mu)[:,None] * (dL_dcav_means*self.cavity_vars/self.diag_Sigma)[None,:]).dot(KiSigma.T)
+
+            #the 'direct' part
+
+            #A = -0.5*self.K_logdet -0.5*np.sum(np.square(tmp)) - 0.5*np.sum(np.diag(self.Ki)*self.tilted.var)
+            dL_dK -= .5 * self.Ki # for the log det.
+            Kim = np.dot(self.Ki, self.tilted.mean)
+            dL_dK += 0.5*Kim[:,None]*Kim[None,:]
+            dL_dK += 0.5*np.dot(self.Ki*self.tilted.var, self.Ki)#the diag part
+
+            dL_dtheta = self.kern.dK_dtheta(dL_dK, self.X)
 
         return np.hstack((dL_dYtilde, dL_dbeta, dL_dtheta))
 
@@ -261,4 +277,6 @@ if __name__=='__main__':
     m_.optimize('bfgs')
     m = classification(X, Y, m_.kern.copy())
     m.constrain_positive('beta')
-    m.randomize();     m.checkgrad(verbose=True)
+    #m.randomize();     m.checkgrad(verbose=True)
+    m.optimize('bfgs')
+    m.plot()

@@ -46,21 +46,6 @@ class quad_tilt(Tilted):
             return x**4 * lik(x) * np.exp(-0.5*np.square((x-m)/s))/SQRT_2PI/s
         return f
 
-    def lik_cav_log_lik_cav(self, lik, m, s):
-        def f(x):
-            l = lik(x)
-            p = np.exp(-0.5*np.square((x-m)/s))/SQRT_2PI/s
-            return l*p*np.log(l*p)
-        return f
-
-    def lik_log_lik_dcav_logcav_dmu(self, lik, m, s):
-        def f(x):
-            l = lik(x)
-            p = np.exp(-0.5*np.square((x-m)/s))/SQRT_2PI/s
-            dln_p_dmu = 0
-            return l*p.log(l*p)
-        return f
-
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)
 
@@ -119,7 +104,7 @@ if __name__=='__main__':
     import GPy
 
     # some data
-    N = 3
+    N = 10
     Y = np.random.randn(N)
 
     # some cavity distributions:
@@ -165,13 +150,13 @@ if __name__=='__main__':
             return np.hstack((self.tilted.dH_dmu, self.tilted.dH_dsigma2))
 
 
-    print 'grads of mean'
-    c = cg_m(Y, mu, var)
-    c.checkgrad(verbose=1)
+    #print 'grads of mean'
+    #c = cg_m(Y, mu, var)
+    #c.checkgrad(verbose=1)
 
-    print 'grads of var'
-    c = cg_v(Y, mu, var)
-    c.checkgrad(verbose=1)
+    #print 'grads of var'
+    #c = cg_v(Y, mu, var)
+    #c.checkgrad(verbose=1)
 
     #print 'grads of H'
     #c = cg_H(Y, mu, var)

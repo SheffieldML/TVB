@@ -19,6 +19,12 @@ class Heaviside(Tilted):
     def __init__(self, Y):
         Tilted.__init__(self,Y)
         self.Ysign = np.where(self.Y==1,1,-1)
+    def _set_params(self, x):
+        pass
+    def _get_params(self):
+        return np.zeros(0)
+    def _get_param_names(self):
+        return []
 
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)
@@ -47,12 +53,12 @@ class Heaviside(Tilted):
         self.H = 0.5*np.log(2*np.pi*self.sigma2) + np.log(self.Z) + 0.5*(self.mu**2 + self.var + self.mean**2 - 2*self.mean*self.mu)/self.sigma2
 
         #entropy derivatives
-        self.dH_dmu = self.Ysign*(0.5 / self.sigma2) * (self.N_Z * (self.sigma + self.mu ** 2 / self.sigma) + self.Ysign*self.mu * self.N_Z2)
-        self.dH_dsigma2 =(
-                1./(2*self.sigma2) - self.N_Z * (self.a/(2*self.sigma2))
-                + .5 * (1./(self.sigma2)) * (self.dvar_dsigma2 + (2*self.mean - 2*self.mu) * self.dmean_dsigma2)
-                - 0.5/(self.sigma2**2) * (self.mu**2 + self.var + self.mean**2 - 2*self.mean*self.mu)
-                )
+        #self.dH_dmu = self.Ysign*(0.5 / self.sigma2) * (self.N_Z * (self.sigma + self.mu ** 2 / self.sigma) + self.Ysign*self.mu * self.N_Z2)
+        #self.dH_dsigma2 =(
+                #1./(2*self.sigma2) - self.N_Z * (self.a/(2*self.sigma2))
+                #+ .5 * (1./(self.sigma2)) * (self.dvar_dsigma2 + (2*self.mean - 2*self.mu) * self.dmean_dsigma2)
+                #- 0.5/(self.sigma2**2) * (self.mu**2 + self.var + self.mean**2 - 2*self.mean*self.mu)
+                #)
 
 
 

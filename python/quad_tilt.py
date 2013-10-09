@@ -40,6 +40,14 @@ class quad_tilt(Tilted):
         self._has_params = True
         self.num_params = 2
 
+    def _set_params(self, x):
+        self.lik._set_params(x)
+    def _get_params(self):
+        return self.lik._get_params()
+    def _get_param_names(self):
+        return self.lik._get_param_names()
+
+
     def integrands(self, lik, Y, m, s, derivs=True):
         """
         compute the multiple-function of the integrands we want

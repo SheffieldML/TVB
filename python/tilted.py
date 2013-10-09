@@ -36,7 +36,6 @@ class Heaviside(Tilted):
         #derivatives of moments
         self.dmean_dmu = 1. - (self.N_Z2 + self.a * self.N_Z)
         self.dmean_dsigma2 = self.Ysign * self.N_Z * 0.5/self.sigma * (1 + self.a * (self.a + self.N_Z))
-        #self.dvar_dmu = -self.Ysign*self.sigma*self.N_Z + self.Ysign*self.a*self.mu*self.N_Z - 3*self.mu*self.N_Z2 - 2*self.sigma*self.N_Z3
         self.dvar_dmu = -self.Ysign*self.sigma *self.N_Z + self.a * self.mu * self.N_Z + 3 * self.mu * self.N_Z2 + 2 * self.Ysign * self.sigma * self.N_Z3
         self.dvar_dsigma2 = 1 - self.N_Z * (self.N_Z + self.a * (.5 + .5*self.a**2 + self.N_Z * (1.5*self.a + self.N_Z)))
 

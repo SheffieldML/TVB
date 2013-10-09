@@ -7,6 +7,8 @@ from scipy.special import gamma, digamma
 from tilted import Tilted
 from quadvgk import inf_quadvgk
 
+import multiprocessing as mp
+
 SQRT_2PI = np.sqrt(2.*np.pi)
 LOG_SQRT_2PI = np.log(SQRT_2PI)
 
@@ -15,22 +17,25 @@ class student_t():
         self._set_params(np.ones(2))
     def _set_params(self, p):
         self.nu, self.lamb = p
+        #compute some constants so that they don't appear in a loop
+        self._pdf_const = gamma((self.nu + 1)/2.) / gamma(self.nu/2.) * np.sqrt(self.lamb/(self.nu*np.pi) )
+        self._dnu_const = 0.5*digamma((self.nu + 1.)/2.) - 0.5*digamma(self.nu/2.) - 0.5/self.nu
     def _get_params(self):
         return np.array([self.nu, self.lamb])
     def _get_param_names(self):
         return ['nu', 'lambda']
     def pdf(self, x, Y):
         x2 = np.square(x-Y)
-        return gamma((self.nu + 1)/2.) / gamma(self.nu/2.) * np.sqrt(self.lamb/(self.nu*np.pi) ) * np.power(1 + self.lamb*x2/self.nu, -(self.nu + 1.)/2.)
+        return self._pdf_const * np.power(1 + self.lamb*x2/self.nu, -(self.nu + 1.)/2.)
     def dlnpdf_dtheta(self, x, Y):
         x2 = np.square(x-Y)
-        dnu = 0.5*digamma((self.nu + 1.)/2.) - 0.5*digamma(self.nu/2.) - 0.5/self.nu - 0.5*np.log(1. + self.lamb*x2/self.nu) + 0.5*(self.nu + 1.)*(self.lamb*x2/self.nu**2)/(1. + self.lamb*x2/self.nu)
+        dnu = self._dnu_const - 0.5*np.log(1. + self.lamb*x2/self.nu) + 0.5*(self.nu + 1.)*(self.lamb*x2/self.nu**2)/(1. + self.lamb*x2/self.nu)
         dlamb =  0.5/self.lamb - 0.5*(self.nu + 1.)*(x2/self.nu/(1.+self.lamb*x2/self.nu))
         return np.vstack((dnu, dlamb))
 
 
 class quad_tilt(Tilted):
-    def __init__(self, Y):
+    def __init__(self, Y, threads=1):
         """
         An illustration of quadtarture for use with var_EP.
         """
@@ -40,13 +45,16 @@ class quad_tilt(Tilted):
         self._has_params = True
         self.num_params = 2
 
+        if (threads>1):
+            self.pool = mp.Pool(threads)
+        self.parallel = threads>1
+
     def _set_params(self, x):
         self.lik._set_params(x)
     def _get_params(self):
         return self.lik._get_params()
     def _get_param_names(self):
         return self.lik._get_param_names()
-
 
     def integrands(self, lik, Y, m, s, derivs=True):
         """
@@ -90,7 +98,7 @@ class quad_tilt(Tilted):
                 return lik(x) * np.exp(-0.5*np.square((x-m)/s))/SQRT_2PI/s * np.power(x, np.arange(5))[:,None]
         return f
 
-    def set_cavity(self, mu, sigma2):
+    def set_cavity(self, mu, sigma2, parallel=False):
         """
         For a new series of cavity distributions,  compute the relevant moments and derivatives
         """
@@ -98,7 +106,15 @@ class quad_tilt(Tilted):
 
         #quadrature!
         #TODO: parallelise this loop (optionally?)
-        quads = np.vstack([inf_quadvgk(self.integrands(self.lik, y_i, m, s, self._has_params))[0] for y_i, m, s in zip(self.Y, self.mu, self.sigma)])
+        if parallel:
+            integrands = [self.integrands(self.lik, y_i, m, s, self._has_params) for y_i, m, s in zip(self.Y, self.mu, self.sigma)]
+            jobs = [self.pool.apply_async(inf_quadvgk, args=(f,)) for f in integrands]
+
+            self.pool.close() # signal that no more data coming in
+            self.pool.join() # wait for all the tasks to complete
+            quads = np.vstack([j.get()[0] for j in jobs])
+        else:
+            quads = np.vstack([inf_quadvgk(self.integrands(self.lik, y_i, m, s, self._has_params))[0] for y_i, m, s in zip(self.Y, self.mu, self.sigma)])
         self.quads = quads
         self.Z = quads[:,0]
         self.mean = quads[:,1]/self.Z
@@ -153,7 +169,7 @@ if __name__=='__main__':
     #a base class for checking the gradient
     class cg(GPy.core.Model):
         def __init__(self,y, mu, var):
-            self.tilted = quad_tilt(y)
+            self.tilted = quad_tilt(y,3)
             self.tilted.set_cavity(mu, var)
             self.N = y.size
             GPy.core.Model.__init__(self)

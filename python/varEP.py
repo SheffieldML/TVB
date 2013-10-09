@@ -76,8 +76,7 @@ class varEP(GPy.core.Model):
         #expectation of the (negative) log cavity
         B = 0.5*np.sum(np.log(self.cavity_vars)) + 0.5*np.sum(np.square(self.cavity_means - self.tilted.mean)/self.cavity_vars) + 0.5*np.sum(self.tilted.var/self.cavity_vars)
 
-        #Z
-        C = np.log(self.tilted.Z).sum()
+        C = np.sum(np.log(self.tilted.Z))
         return A + B + C
 
     def _log_likelihood_gradients(self):
@@ -144,11 +143,12 @@ class varEP(GPy.core.Model):
             dL_dtheta = self.kern.dK_dtheta(dL_dK, self.X)
 
         #now gradient wrt likelihood parameters
-        N = self.tilted._get_params().size
-        if N==0:
+        if self.tilted._get_params().size==0:
             dL_dtheta_lik = np.zeros(0)
         else:
-            dL_dtheta_lik = np.zeros(N)
+            dL_dtheta_lik = np.sum((dA_dq_means + dB_dq_means)*self.tilted.dmean_dtheta, 1) +\
+                            np.sum((dA_dq_vars + dB_dq_vars)*self.tilted.dvar_dtheta, 1) +\
+                            np.sum(self.tilted.dZ_dtheta/self.tilted.Z, 1)
 
         return np.hstack((dL_dYtilde, dL_dbeta, dL_dtheta, dL_dtheta_lik))
 

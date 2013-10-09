@@ -16,7 +16,7 @@ class student_t():
     def _set_params(self, p):
         self.nu, self.lamb = p
     def _get_params(self):
-        return np.hstack((self.nu, self.lamb))
+        return np.array([self.nu, self.lamb])
     def _get_param_names(self):
         return ['nu', 'lambda']
     def pdf(self, x, Y):
@@ -24,8 +24,8 @@ class student_t():
         return gamma((self.nu + 1)/2.) / gamma(self.nu/2.) * np.sqrt(self.lamb/(self.nu*np.pi) ) * np.power(1 + self.lamb*x2/self.nu, -(self.nu + 1.)/2.)
     def dlnpdf_dtheta(self, x, Y):
         x2 = np.square(x-Y)
+        dnu = 0.5*digamma((self.nu + 1.)/2.) - 0.5*digamma(self.nu/2.) - 0.5/self.nu - 0.5*np.log(1. + self.lamb*x2/self.nu) + 0.5*(self.nu + 1.)*(self.lamb*x2/self.nu**2)/(1. + self.lamb*x2/self.nu)
         dlamb =  0.5/self.lamb - 0.5*(self.nu + 1.)*(x2/self.nu/(1.+self.lamb*x2/self.nu))
-        dnu = 0.5*digamma((self.nu + 1.)/2.) - 0.5*digamma(self.nu/2.) - 0.5/self.nu - 0.5*self.nu*np.log(1. + self.lamb*x2/self.nu) + 0.5*(self.nu + 1.)*(self.lamb*x2/self.nu**2)/(1. + self.lamb*x2/self.nu)
         return np.vstack((dnu, dlamb))
 
 
@@ -58,8 +58,12 @@ class quad_tilt(Tilted):
         the variable of integration.  f returns a matrix representing several
         functions evaluated at those points. Let c(x) be a the 'cavity'
         distribution, c(x) = N(x|m, s**2), p(y|x) is a likelihood, then f
-        computes the following functions on x p(y|x) * c(x) p(y|x) * c(x) * x
-        p(y|x) * c(x) * x**2 p(y|x) * c(x) * x**3 p(y|x) * c(x) * x**4
+        computes the following functions on x
+        p(y|x) * c(x)
+        p(y|x) * c(x) * x
+        p(y|x) * c(x) * x**2
+        p(y|x) * c(x) * x**3
+        p(y|x) * c(x) * x**4
 
         if derivs is true, we also stack in:
 
@@ -99,28 +103,26 @@ class quad_tilt(Tilted):
         self.Z = quads[:,0]
         self.mean = quads[:,1]/self.Z
         self.Ex2 = quads[:,2]/self.Z
+        self.var = self.Ex2 - np.square(self.mean)
         self.Ex3 = quads[:,3]/self.Z
         self.Ex4 = quads[:,4]/self.Z
         self.dZ_dtheta = quads[:,5::3].T
+
+        #derivatives of the mean, variance wrt theta
         self.dmean_dtheta = quads[:,6::3].T/self.Z - self.dZ_dtheta*self.mean/self.Z
         self.dEx2_dtheta = quads[:,7::3].T/self.Z  - self.dZ_dtheta*self.Ex2/self.Z
         self.dvar_dtheta = self.dEx2_dtheta - 2*self.mean*self.dmean_dtheta
 
-
+        #derivatives of Z wrt cavity mean, var
         self.dZ_dmu = self.Z/self.sigma2*(self.mean - self.mu)
         self.dZ_dsigma2 = self.Z/self.sigma2**2/2*(self.Ex2 + self.mu**2 - 2*self.mu*self.mean) - 0.5*self.Z/self.sigma2
 
-        #get the variance throught the square rule
-        self.var = self.Ex2 - np.square(self.mean)
-
-        #derivatives of the mean
+        #derivatives of the mean wrt cavity mean, var
         self.dmean_dmu = self.var/self.sigma2
-
         self.dmean_dsigma2 = -0.5*self.mean/self.sigma2 + 0.5*(self.Ex3 + self.mu**2*self.mean - 2*self.mu*self.Ex2)/self.sigma2**2 - self.mean*self.dZ_dsigma2/self.Z
 
-        #derivatives of the variance
+        #derivatives of the variance wrt cavity mean, var
         self.dvar_dmu = (self.Ex3 - self.mean*self.Ex2)/self.sigma2 - 2.*self.mean*self.dmean_dmu
-
         self.dvar_dsigma2 = -0.5*self.Ex2/self.sigma2 + 0.5/self.sigma2**2*(self.Ex4 + self.Ex2*self.mu**2 - 2.*self.Ex3*self.mu) - self.Ex2*self.dZ_dsigma2/self.Z - 2*self.mean*self.dmean_dsigma2
 
     def plot(self, index=0):
@@ -196,17 +198,17 @@ if __name__=='__main__':
     #a different class for checking the erivatives of the parameters
     class cg(GPy.core.Model):
         def __init__(self,y, mu, var):
+            self.mu, self.var = mu, var
             self.tilted = quad_tilt(y)
             self.tilted.set_cavity(mu, var)
-            self.N = y.size
             GPy.core.Model.__init__(self)
         def _set_params(self,x):
-            self.tilted.lik._set_params(x)
-            self.tilted.set_cavity(mu, var)
+            self.tilted._set_params(x)
+            self.tilted.set_cavity(self.mu, self.var)
         def _get_params(self):
-            return self.tilted.lik._get_params()
+            return self.tilted._get_params()
         def _get_param_names(self):
-            return self.tilted.lik._get_param_names()
+            return self.tilted._get_param_names()
 
     class cg_Z(cg):
         def log_likelihood(self):
@@ -228,16 +230,25 @@ if __name__=='__main__':
     c = cg_m(Y, mu, var)
     c.checkgrad(verbose=1)
 
-    class cg_m(cg):
+    class cg_var(cg):
         def log_likelihood(self):
             return self.tilted.var.sum()
         def _log_likelihood_gradients(self):
             return self.tilted.dvar_dtheta.sum(1)
 
     print 'grads of var wrt theta'
-    c = cg_m(Y, mu, var)
+    c = cg_var(Y, mu, var)
     c.checkgrad(verbose=1)
 
+    class cg_logZ(cg):
+        def log_likelihood(self):
+            return np.sum(np.log(self.tilted.Z))
+        def _log_likelihood_gradients(self):
+            return np.sum(self.tilted.dZ_dtheta/self.tilted.Z,1)
+
+    print 'grads of logZ wrt theta'
+    c = cg_logZ(Y, mu, var)
+    c.checkgrad(verbose=1)
 
 
 

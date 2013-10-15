@@ -2,7 +2,7 @@ import numpy as np
 import pylab as pb
 from scipy.io import loadmat
 import GPy
-from classification1 import classification
+from classification2 import classification
 import sys
 import os
 
@@ -92,6 +92,7 @@ def compare(Xtrain, Ytrain, Xtest, Ytest):
 for dn in dataset_names:
     if dn[:2]=='__':continue # first 3 keys are meta-data from the mat file
     if dn=='benchmarks': continue
+    if dn=='image': continue # image takes forever
     if dn+'raw_results' in os.listdir('.'):
         print dn, 'is done already'
         continue
@@ -107,9 +108,9 @@ for dn in dataset_names:
     #cut duplicates from the training set...
     train_inds = [np.unique(ti) for ti in train_inds]
 
-    #onyl do 20 folds, not 100 (for now) TODO: remove
-    train_inds = train_inds[:20]
-    test_inds = test_inds[:20]
+    ##onyl do 20 folds, not 100 (for now) TODO: remove
+    #train_inds = train_inds[:16]
+    #test_inds = test_inds[:16]
 
     results = par_map(compare,
             [X[tr_i] for tr_i in train_inds],

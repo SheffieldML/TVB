@@ -52,12 +52,13 @@ def quadvgk(f, a, b, difftol=1e-4, xtol=1e-4):
         neval += x.size
         Q1 = np.dot(FV.reshape(NF, NK, NM).swapaxes(2,1),WK)*M
         Q2 = np.dot(FV.reshape(NF, NK, NM).swapaxes(2,1)[:,:,1::2],WG)*M
-        ind = np.nonzero(np.logical_or(np.max(np.abs((Q1-Q2)/Q1), 0) < difftol , M < xtol))[0]
+        #ind = np.nonzero(np.logical_or(np.max(np.abs((Q1-Q2)/Q1), 0) < difftol , M < xtol))[0]
+        ind = np.nonzero(np.logical_or(np.max(np.abs((Q1-Q2)), 0) < difftol , M < xtol))[0]
         Q = Q + np.sum(Q1[:,ind], 1)
         Subs = np.delete(Subs, ind, axis=1)
     return Q, neval
 
-def inf_quadvgk(f, difftol=1e-4, xtol=1e-3):
+def inf_quadvgk(f, difftol=1e-3, xtol=5e-3):
     """
     integrate f(x) from -inf to inf, by changing the variable:
     x = r/(1-r^2)

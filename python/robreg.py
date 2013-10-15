@@ -1,12 +1,10 @@
 import numpy as np
-import pylab as pb
-pb.ion()
 import GPy
-from truncnorm import truncnorm
-from GPy.models.gradient_checker import GradientChecker
-from scipy.special import erf
 from varEP import varEP
 from quad_tilt import quad_tilt
+from functools import partial
+from integrate import integrate
+import pylab as pb
 
 class robreg(varEP):
     def __init__(self, X, Y, kern=None):
@@ -16,6 +14,16 @@ class robreg(varEP):
     def predict(self, Xnew):
         mu, var = self._predict_raw(Xnew)
         return mu
+
+    def validate(self, Xnew, Ynew):
+        """
+        return p(Y* | X*) for each of the Xnew, Ynew.
+        """
+        mu, var = self._predict_raw(Xnew)
+        f = partial(integrate, lik=self.tilted.lik, derivs=False)
+        quads, numevals = zip(*map(f,Ynew.flatten(), mu.flatten(), np.sqrt(var.flatten())))
+        quads = np.vstack(quads)
+        return quads[:,0]
 
     def plot(self):
         if self.X.shape[1]==1:
@@ -33,6 +41,8 @@ class robreg(varEP):
 
 
 if __name__=='__main__':
+    import pylab as pb
+    pb.ion()
     pb.close('all')
     #construct a data set
     X = np.linspace(0,1,20)[:,None]

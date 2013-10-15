@@ -8,7 +8,7 @@ import tilted
 
 class varEP(GPy.core.Model):
     def __init__(self, X, tilted, kern=None):
-        #accept the constructino arguments
+        #accept the construction arguments
         self.X = X
         self.tilted = tilted
         if kern is None:

@@ -1,53 +1,31 @@
 import numpy as np
 import pylab as pb
-pb.close('all')
-from scipy.integrate import quad
-from scipy.special import gamma, digamma
 
 from tilted import Tilted
-from quadvgk import inf_quadvgk
+from integrate import integrate
 
-import multiprocessing as mp
+from IPython import parallel
+from functools import partial
 
-SQRT_2PI = np.sqrt(2.*np.pi)
-LOG_SQRT_2PI = np.log(SQRT_2PI)
-
-class student_t():
-    def __init__(self):
-        self._set_params(np.ones(2))
-    def _set_params(self, p):
-        self.nu, self.lamb = p
-        #compute some constants so that they don't appear in a loop
-        self._pdf_const = gamma((self.nu + 1)/2.) / gamma(self.nu/2.) * np.sqrt(self.lamb/(self.nu*np.pi) )
-        self._dnu_const = 0.5*digamma((self.nu + 1.)/2.) - 0.5*digamma(self.nu/2.) - 0.5/self.nu
-    def _get_params(self):
-        return np.array([self.nu, self.lamb])
-    def _get_param_names(self):
-        return ['nu', 'lambda']
-    def pdf(self, x, Y):
-        x2 = np.square(x-Y)
-        return self._pdf_const * np.power(1 + self.lamb*x2/self.nu, -(self.nu + 1.)/2.)
-    def dlnpdf_dtheta(self, x, Y):
-        x2 = np.square(x-Y)
-        dnu = self._dnu_const - 0.5*np.log(1. + self.lamb*x2/self.nu) + 0.5*(self.nu + 1.)*(self.lamb*x2/self.nu**2)/(1. + self.lamb*x2/self.nu)
-        dlamb =  0.5/self.lamb - 0.5*(self.nu + 1.)*(x2/self.nu/(1.+self.lamb*x2/self.nu))
-        return np.vstack((dnu, dlamb))
-
+from likelihoods import student_t
 
 class quad_tilt(Tilted):
-    def __init__(self, Y, threads=1):
+    def __init__(self, Y, in_parallel=False):
         """
         An illustration of quadtarture for use with var_EP.
         """
         Tilted.__init__(self,Y)
         self.Y = Y.flatten() # we're only doing 1D at the moment
+        self.num_data = self.Y.size
         self.lik  = student_t() # hard coded right now. Incorporate into GPy when the code is ready.
         self._has_params = True
         self.num_params = 2
 
-        if (threads>1):
-            self.pool = mp.Pool(threads)
-        self.parallel = threads>1
+        self.parallel = in_parallel
+        if self.parallel:
+            self.client = parallel.Client()
+            self.dv = self.client.direct_view()
+
 
     def _set_params(self, x):
         self.lik._set_params(x)
@@ -56,66 +34,22 @@ class quad_tilt(Tilted):
     def _get_param_names(self):
         return self.lik._get_param_names()
 
-    def integrands(self, lik, Y, m, s, derivs=True):
-        """
-        compute the multiple-function of the integrands we want
 
-        This function returns a function!
-
-        f accepts a vector of inputs (1D numpy array), representing points of
-        the variable of integration.  f returns a matrix representing several
-        functions evaluated at those points. Let c(x) be a the 'cavity'
-        distribution, c(x) = N(x|m, s**2), p(y|x) is a likelihood, then f
-        computes the following functions on x
-        p(y|x) * c(x)
-        p(y|x) * c(x) * x
-        p(y|x) * c(x) * x**2
-        p(y|x) * c(x) * x**3
-        p(y|x) * c(x) * x**4
-
-        if derivs is true, we also stack in:
-
-        p(y|x) * c(x) * d(ln p(y|x) / d theta)
-        p(y|x) * c(x) * d(ln p(y|x) / d theta) + x
-        p(y|x) * c(x) * d(ln p(y|x) / d theta) + x**2
-
-        where theta is some parameter of the likelihood (e.g. the std of the noise, of the degree of freedom)
-
-        If there are several parameters which require derivatives, then we have
-        multiple lines for each.
-
-        """
-        assert np.array(Y).size==1, "we're only doing 1 data point at a time"
-        if derivs:
-            def f(x):
-                a = lik.pdf(x, Y) * np.exp(-0.5*np.square((x-m)/s))/SQRT_2PI/s
-                p = np.power(x, np.arange(5)[:,None])
-                pp = np.tile(p[:3], [self.num_params, 1])
-                derivs = lik.dlnpdf_dtheta(x, Y).repeat(3,0)
-                return a * np.vstack((p, pp*derivs))[:,None]
-        else:
-            def f(x):
-                return lik(x) * np.exp(-0.5*np.square((x-m)/s))/SQRT_2PI/s * np.power(x, np.arange(5))[:,None]
-        return f
-
-    def set_cavity(self, mu, sigma2, parallel=False):
+    def set_cavity(self, mu, sigma2):
         """
         For a new series of cavity distributions,  compute the relevant moments and derivatives
         """
         Tilted.set_cavity(self, mu, sigma2)
 
-        #quadrature!
-        #TODO: parallelise this loop (optionally?)
-        if parallel:
-            integrands = [self.integrands(self.lik, y_i, m, s, self._has_params) for y_i, m, s in zip(self.Y, self.mu, self.sigma)]
-            jobs = [self.pool.apply_async(inf_quadvgk, args=(f,)) for f in integrands]
 
-            self.pool.close() # signal that no more data coming in
-            self.pool.join() # wait for all the tasks to complete
-            quads = np.vstack([j.get()[0] for j in jobs])
+        #quadrature!
+        f = partial(integrate, lik=self.lik, derivs=self._has_params)
+        if self.parallel:
+            quads, numevals = zip(*self.dv.map(f, self.Y, self.mu, self.sigma))
         else:
-            quads = np.vstack([inf_quadvgk(self.integrands(self.lik, y_i, m, s, self._has_params))[0] for y_i, m, s in zip(self.Y, self.mu, self.sigma)])
-        self.quads = quads
+            quads, numevals = zip(*map(f, self.Y, self.mu, self.sigma))
+        quads = np.vstack(quads)
+
         self.Z = quads[:,0]
         self.mean = quads[:,1]/self.Z
         self.Ex2 = quads[:,2]/self.Z
@@ -158,8 +92,10 @@ class quad_tilt(Tilted):
 if __name__=='__main__':
     import GPy
 
+    verbose = True
+
     # some data
-    N = 5
+    N = 800
     Y = np.random.randn(N)
 
     # some cavity distributions:
@@ -169,7 +105,7 @@ if __name__=='__main__':
     #a base class for checking the gradient
     class cg(GPy.core.Model):
         def __init__(self,y, mu, var):
-            self.tilted = quad_tilt(y,3)
+            self.tilted = quad_tilt(y,in_parallel=True)
             self.tilted.set_cavity(mu, var)
             self.N = y.size
             GPy.core.Model.__init__(self)
@@ -200,22 +136,24 @@ if __name__=='__main__':
 
     print 'grads of mean'
     c = cg_m(Y, mu, var)
-    c.checkgrad(verbose=1)
-    [c.tilted.plot(i) for i in range(N)]
+    c.checkgrad(verbose=verbose)
+    #[c.tilted.plot(i) for i in range(N)]
+    c.parmap = False
+    print c.checkgrad(verbose=verbose)
 
     print 'grads of var'
     c = cg_v(Y, mu, var)
-    c.checkgrad(verbose=1)
+    c.checkgrad(verbose=verbose)
 
     print 'grads of Z'
     c = cg_Z(Y, mu, var)
-    c.checkgrad(verbose=1)
+    c.checkgrad(verbose=verbose)
 
     #a different class for checking the erivatives of the parameters
     class cg(GPy.core.Model):
         def __init__(self,y, mu, var):
             self.mu, self.var = mu, var
-            self.tilted = quad_tilt(y)
+            self.tilted = quad_tilt(y, in_parallel=True)
             self.tilted.set_cavity(mu, var)
             GPy.core.Model.__init__(self)
         def _set_params(self,x):
@@ -234,7 +172,7 @@ if __name__=='__main__':
 
     print 'grads of Z wrt theta'
     c = cg_Z(Y, mu, var)
-    c.checkgrad(verbose=1)
+    c.checkgrad(verbose=verbose)
 
     class cg_m(cg):
         def log_likelihood(self):
@@ -244,7 +182,7 @@ if __name__=='__main__':
 
     print 'grads of mean wrt theta'
     c = cg_m(Y, mu, var)
-    c.checkgrad(verbose=1)
+    c.checkgrad(verbose=verbose)
 
     class cg_var(cg):
         def log_likelihood(self):
@@ -254,7 +192,7 @@ if __name__=='__main__':
 
     print 'grads of var wrt theta'
     c = cg_var(Y, mu, var)
-    c.checkgrad(verbose=1)
+    c.checkgrad(verbose=verbose)
 
     class cg_logZ(cg):
         def log_likelihood(self):
@@ -264,7 +202,7 @@ if __name__=='__main__':
 
     print 'grads of logZ wrt theta'
     c = cg_logZ(Y, mu, var)
-    c.checkgrad(verbose=1)
+    c.checkgrad(verbose=verbose)
 
 
 

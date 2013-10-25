@@ -16,9 +16,10 @@ def norm_pdf(x):
 
 
 class Heaviside(Tilted):
-    def __init__(self, Y):
+    def __init__(self, Y, do_entropy=False):
         Tilted.__init__(self,Y)
         self.Ysign = np.where(self.Y==1,1,-1)
+        self.do_entropy = do_entropy
     def _set_params(self, x):
         pass
     def _get_params(self):
@@ -49,16 +50,17 @@ class Heaviside(Tilted):
         self.dZ_dmu = self.N*self.Ysign/self.sigma
         self.dZ_dsigma2 = -0.5*self.N*self.Ysign*self.mu/self.sigma2/self.sigma
 
-        #compute entropy
-        self.H = 0.5*np.log(2*np.pi*self.sigma2) + np.log(self.Z) + 0.5*(self.mu**2 + self.var + self.mean**2 - 2*self.mean*self.mu)/self.sigma2
+        if self.do_entropy:
+            #compute entropy
+            self.H = 0.5*np.log(2*np.pi*self.sigma2) + np.log(self.Z) + 0.5*(self.mu**2 + self.var + self.mean**2 - 2*self.mean*self.mu)/self.sigma2
 
-        #entropy derivatives
-        #self.dH_dmu = self.Ysign*(0.5 / self.sigma2) * (self.N_Z * (self.sigma + self.mu ** 2 / self.sigma) + self.Ysign*self.mu * self.N_Z2)
-        #self.dH_dsigma2 =(
-                #1./(2*self.sigma2) - self.N_Z * (self.a/(2*self.sigma2))
-                #+ .5 * (1./(self.sigma2)) * (self.dvar_dsigma2 + (2*self.mean - 2*self.mu) * self.dmean_dsigma2)
-                #- 0.5/(self.sigma2**2) * (self.mu**2 + self.var + self.mean**2 - 2*self.mean*self.mu)
-                #)
+            #entropy derivatives
+            self.dH_dmu = self.Ysign*(0.5 / self.sigma2) * (self.N_Z * (self.sigma + self.mu ** 2 / self.sigma) + self.Ysign*self.mu * self.N_Z2)
+            self.dH_dsigma2 =(
+                    1./(2*self.sigma2) - self.N_Z * (self.a/(2*self.sigma2))
+                    + .5 * (1./(self.sigma2)) * (self.dvar_dsigma2 + (2*self.mean - 2*self.mu) * self.dmean_dsigma2)
+                    - 0.5/(self.sigma2**2) * (self.mu**2 + self.var + self.mean**2 - 2*self.mean*self.mu)
+                    )
 
 
 

@@ -21,7 +21,7 @@ class classification(GPy.core.Model):
         self.Ytilde = np.zeros(self.num_data)
         self.beta = np.zeros(self.num_data) + 0.1
 
-        self.tilted = tilted.Heaviside(self.Y)
+        self.tilted = tilted.Heaviside(self.Y, do_entropy=True)
 
         self.ensure_default_constraints()
         self.constrain_positive('beta')

@@ -84,7 +84,11 @@ class Probit(Tilted):
         
         self.mean = self.mu + self.Ysign*self.sigma2*self.N_Z/(np.sqrt(sigma2p1))
         self.var = self.sigma2*(1. - ((self.sigma2 * self.N_Z / sigma2p1) * (self.a + self.N_Z)))
-        
+
+        self.dZ_dmu = self.N*self.Ysign/np.sqrt(sigma2p1)
+        self.dZ_dsigma2 = -0.5*self.N*self.Ysign*self.mu*np.power(sigma2p1, -1.5)
+
+
         self.dmean_dmu = (1 - self.sigma2/sigma2p1 * self.N_Z * (self.a + self.N_Z))
         
         self.dN_dsigma2 = - self.N * self.a * da_dsigma2
@@ -99,8 +103,8 @@ class Probit(Tilted):
                          #* ((self.a + (self.Ysign/sigma2p1) + 2) * (self.N_Z + self.a)))
                           * (1 + (self.a + 2*self.N_Z) * (self.N_Z + self.a)))
 
-    pass
-
+        dN_Z_dmu = -self.Ysign/np.sqrt(sigma2p1)*(self.a*self.N_Z + self.N_Z2)
+        self.dvar_dmu = -self.sigma2**2/sigma2p1*(dN_Z_dmu*self.a + 2.*dN_Z_dmu*self.N_Z + self.N_Z*self.Ysign/np.sqrt(sigma2p1))
 
 
 if __name__=='__main__':
@@ -109,7 +113,29 @@ if __name__=='__main__':
     Y[Y==0] = -1
     probit = Probit(Y)
     mu = np.random.randn(N)
-    sigma2 = np.random.rand(N)    
+    sigma2 = np.random.rand(N)
+    
+    #gradcheck for Z wrt mu
+    def f(mu):
+        probit.set_cavity(mu, sigma2)
+        return probit.Z
+    def df(mu):
+        probit.set_cavity(mu, sigma2)
+        return probit.dZ_dmu
+    m = GradientChecker(f,df,np.random.randn(N))
+    m.checkgrad(verbose=1)
+
+    #gradcheck for Z wrt sigma2
+    def f(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.Z
+    def df(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.dZ_dsigma2
+    m = GradientChecker(f,df,np.random.rand(N))
+    m.checkgrad(verbose=1)
+
+    #gradcheck for mean wrt mu
     def f(mu):
         probit.set_cavity(mu, sigma2)
         return probit.mean
@@ -118,33 +144,19 @@ if __name__=='__main__':
         return probit.dmean_dmu
     m = GradientChecker(f,df,np.random.randn(N))
     m.checkgrad(verbose=1)
-#     def f(mu):
-#         probit.set_cavity(mu, sigma2)
-#         return probit.var
-#     def df(mu):
-#         probit.set_cavity(mu, sigma2)
-#         return probit.dvar_dmu
-#     m = GradientChecker(f,df,np.random.randn(N))    
-#     m.checkgrad(verbose=1)
-#     mu = np.random.randn(N)
-#     def f(sigma2):
-#         probit.set_cavity(mu, sigma2)
-#         return probit.mean
-#     def df(sigma2):
-#         probit.set_cavity(mu, sigma2)
-#         return probit.dmean_dsigma2
-#     m = GradientChecker(f,df,np.random.rand(N))    
-#     m.checkgrad(verbose=1)
-#     def f(sigma2):
-#         probit.set_cavity(mu, sigma2)
-#         return probit.a
-#     def df(sigma2):
-#         probit.set_cavity(mu, sigma2)
-#         return probit.da_dsigma2
-#     m = GradientChecker(f,df,np.random.rand(N))
-#     print 'da_dsigma2'  
-#     m.checkgrad(verbose=1)
-    def f(sigma2):
+
+    #gradcheck for var wrt mu
+    def f(mu):
+        probit.set_cavity(mu, sigma2)
+        return probit.var
+    def df(mu):
+        probit.set_cavity(mu, sigma2)
+        return probit.dvar_dmu
+    m = GradientChecker(f,df,np.random.randn(N))
+    m.checkgrad(verbose=1)
+
+	£ gradcheck dN_dsigma2    
+	def f(sigma2):
         probit.set_cavity(mu, sigma2)
         return probit.N
     def df(sigma2):
@@ -154,6 +166,15 @@ if __name__=='__main__':
     print 'dN_dsigma2'  
     m.checkgrad(verbose=1)
 
+    #gradcheck for mean wrt sigma2
+	def f(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.mean
+    def df(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.dmean_dsigma2
+    m = GradientChecker(f,df,np.random.rand(N))    
+    m.checkgrad(verbose=1)
 #     from truncnorm import truncnorm
 #     mu = np.random.randn(2)
 #     sigma2 = np.exp(np.random.randn(2))

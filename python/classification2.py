@@ -9,9 +9,14 @@ import tilted
 from varEP import varEP
 
 class classification(varEP):
-    def __init__(self, X, Y, kern=None):
+    def __init__(self, X, Y, kern=None, link='probit'):
         self.Y = Y
-        varEP.__init__(self,X, tilted.Heaviside(Y.flatten()), kern)
+        if link=='probit':
+            varEP.__init__(self,X, tilted.Probit(Y.flatten()), kern)
+        elif link=='heaviside':
+            varEP.__init__(self,X, tilted.Heaviside(Y.flatten()), kern)
+        else:
+            raise ValueError('bad link name')
 
     def predict(self, Xnew):
         mu, var = self._predict_raw(Xnew)

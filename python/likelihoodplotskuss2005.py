@@ -55,7 +55,7 @@ if __name__ == '__main__':
             m.randomize()
             m.optimize('bfgs', messages=0)#, bfgs_factor=1e20)
             Z_tVB[i,j] =  m.log_likelihood()
-            Z_tVB_alt[i,j] = m.alternative_log_likelihood()
+            #Z_tVB_alt[i,j] = m.alternative_log_likelihood()
 
             #Do EP
             m_ep._set_params(np.array([np.exp(aa), np.exp(ll), 1e-6]))

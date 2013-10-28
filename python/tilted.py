@@ -107,6 +107,11 @@ class Probit(Tilted):
         dN_Z_dmu = -self.Ysign/np.sqrt(sigma2p1)*(self.a*self.N_Z + self.N_Z2)
         self.dvar_dmu = -self.sigma2**2/sigma2p1*(dN_Z_dmu*self.a + 2.*dN_Z_dmu*self.N_Z + self.N_Z*self.Ysign/np.sqrt(sigma2p1))
 
+        self.dvar_dsigma2 = self.var/self.sigma2\
+                + (self.N_Z*self.a + self.N_Z2)/np.square(sigma2p1)\
+                + self.sigma2/sigma2p1*(-0.5*self.Ysign*self.mu*self.N_Z*np.power(sigma2p1, -1.5)\
+                    + self.a*dN_Z_dsigma2 + 2.*self.N_Z*dN_Z_dsigma2)
+
 
 if __name__=='__main__':
     N = 4
@@ -176,6 +181,18 @@ if __name__=='__main__':
         return probit.dmean_dsigma2
     m = GradientChecker(f,df,np.random.rand(N))    
     m.checkgrad(verbose=1)
+
+    #gradcheck for var wrt sigma2
+    def f(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.var
+    def df(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.dvar_dsigma2
+    m = GradientChecker(f,df,np.random.rand(N))
+    m.checkgrad(verbose=1)
+
+
 #     from truncnorm import truncnorm
 #     mu = np.random.randn(2)
 #     sigma2 = np.exp(np.random.randn(2))

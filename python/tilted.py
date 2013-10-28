@@ -92,6 +92,7 @@ class Probit(Tilted):
         self.dmean_dmu = (1 - self.sigma2/sigma2p1 * self.N_Z * (self.a + self.N_Z))
         
         self.dN_Z_dsigma2 = -self.N_Z*da_dsigma2*(self.N_Z + self.a)
+        dN_Z_dsigma2 = self.dN_Z_dsigma2
         
         self.dmean_dsigma2 = (self.Ysign*self.N_Z/np.sqrt(sigma2p1)
                            *(1+self.sigma2*(

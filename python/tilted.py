@@ -109,9 +109,9 @@ class Probit(Tilted):
         self.dvar_dmu = -self.sigma2**2/sigma2p1*(dN_Z_dmu*self.a + 2.*dN_Z_dmu*self.N_Z + self.N_Z*self.Ysign/np.sqrt(sigma2p1))
 
         self.dvar_dsigma2 = self.var/self.sigma2\
-                + (self.N_Z*self.a + self.N_Z2)/np.square(sigma2p1)\
+                - self.sigma2*((self.N_Z*self.a + self.N_Z2)/np.square(sigma2p1)\
                 + self.sigma2/sigma2p1*(-0.5*self.Ysign*self.mu*self.N_Z*np.power(sigma2p1, -1.5)\
-                    + self.a*dN_Z_dsigma2 + 2.*self.N_Z*dN_Z_dsigma2)
+                + (self.a + 2.*self.N_Z)*dN_Z_dsigma2))
 
 
 if __name__=='__main__':

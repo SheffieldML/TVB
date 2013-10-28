@@ -100,6 +100,8 @@ class Probit(Tilted):
                                 +self.Ysign*self.a*self.mu/(self.Z*np.sqrt(sigma2p1))
                                 -.5)
                              )/sigma2p1) 
+        self.dmean_dsigma2 = self.Ysign*self.N_Z*(self.sigma2 + 2.)/2/np.power(sigma2p1, 1.5)\
+                             + self.Ysign*self.sigma2/np.sqrt(sigma2p1)*self.dN_Z_dsigma2
         
         self.dvar_dmu = -((self.Ysign/np.sqrt(sigma2p1)) * (np.square(self.sigma2)/sigma2p1) * self.N_Z
                          #* ((self.a + (self.Ysign/sigma2p1) + 2) * (self.N_Z + self.a)))

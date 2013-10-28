@@ -1,8 +1,9 @@
 import numpy as np
 import pylab as pb
 from scipy.special import erf
+from GPy.models.gradient_checker import GradientChecker
 
-class Tilted:
+class Tilted(object):
     def __init__(self, Y):
         self.Y = Y
     def set_cavity(self, mu, sigma2):
@@ -62,16 +63,78 @@ class Heaviside(Tilted):
                     - 0.5/(self.sigma2**2) * (self.mu**2 + self.var + self.mean**2 - 2*self.mean*self.mu)
                     )
 
+class Probit(Tilted):
+    def __init__(self, Y):
+        super(Probit, self).__init__(Y)
+        self.Ysign = np.where(self.Y==1,1,-1)
+
+    def set_cavity(self, mu, sigma2):
+        Tilted.set_cavity(self, mu, sigma2)
+        self.a = self.Ysign*self.mu/(np.sqrt(1+self.sigma2))
+        self.Z = norm_cdf(self.a)
+        self.N = norm_pdf(self.a)
+        self.N_Z = self.N/self.Z
+        self.N_Z2 = np.square(self.N_Z)
+        self.N_Z3 = self.N_Z2*self.N_Z
+        
+        sigma2p1 = 1 + self.sigma2
+
+        self.mean = self.mu + self.Ysign*self.sigma2*self.N_Z/(np.sqrt(sigma2p1))
+        self.var = self.sigma2*(1. - ((self.sigma2 * self.N_Z / sigma2p1) * (self.a + self.N_Z)))
+        
+        self.dmean_dmu = (1 - self.sigma2/sigma2p1 * self.N_Z * (self.a + self.N_Z))
+        self.dmean_dsigma2 = (self.Ysign*self.N_Z/np.sqrt(sigma2p1)
+                           *(1+self.sigma2*(
+                                self.N_Z*self.Ysign*self.mu/(2*np.sqrt(sigma2p1))
+                                +self.Ysign*self.a*self.mu/(self.Z*np.sqrt(sigma2p1))
+                                -.5)
+                             )/sigma2p1) 
+        
+        self.dvar_dmu = -((self.Ysign/np.sqrt(sigma2p1)) * (np.square(self.sigma2)/sigma2p1) * self.N_Z
+                         #* ((self.a + (self.Ysign/sigma2p1) + 2) * (self.N_Z + self.a)))
+                          * (1 + (self.a + 2*self.N_Z) * (self.N_Z + self.a)))
+
+    pass
 
 
 
 if __name__=='__main__':
-    from truncnorm import truncnorm
-    mu = np.random.randn(2)
-    sigma2 = np.exp(np.random.randn(2))
-    Y = np.array([1,0])
-    tns = [truncnorm(mu[0], sigma2[0], 'left'), truncnorm(mu[1], sigma2[1], 'right')]
-    tilted = Heaviside(Y)
-    tilted.set_cavity(mu, sigma2)
+    N = 4
+    Y = np.random.randint(2,size=N)
+    Y[Y==0] = -1
+    probit = Probit(Y)
+    sigma2 = np.random.rand(N)
+    def f(mu):
+        probit.set_cavity(mu, sigma2)
+        return probit.mean
+    def df(mu):
+        probit.set_cavity(mu, sigma2)
+        return probit.dmean_dmu
+    m = GradientChecker(f,df,np.random.randn(N))
+    m.checkgrad(verbose=1)
+    def f(mu):
+        probit.set_cavity(mu, sigma2)
+        return probit.var
+    def df(mu):
+        probit.set_cavity(mu, sigma2)
+        return probit.dvar_dmu
+    m = GradientChecker(f,df,np.random.randn(N))    
+    m.checkgrad(verbose=1)
+    mu = np.random.randn(N)
+    def f(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.mean
+    def df(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.dmean_dsigma2
+    m = GradientChecker(f,df,np.random.rand(N))    
+    m.checkgrad(verbose=1)
+#     from truncnorm import truncnorm
+#     mu = np.random.randn(2)
+#     sigma2 = np.exp(np.random.randn(2))
+#     Y = np.array([1,0])
+#     tns = [truncnorm(mu[0], sigma2[0], 'left'), truncnorm(mu[1], sigma2[1], 'right')]
+#     tilted = Heaviside(Y)
+#     tilted.set_cavity(mu, sigma2)
 
 

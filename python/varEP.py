@@ -37,7 +37,7 @@ class varEP(GPy.core.Model):
         self.K = self.kern.K(self.X)
         self.Ki, self.L, _,self.K_logdet = GPy.util.linalg.pdinv(self.K)
         self.Sigma_inv = self.Ki + np.diag(self.beta)
-        self.Sigma,_,_,_ = GPy.util.linalg.pdinv(self.Sigma_inv)
+        self.Sigma,_,_,self.log_det_Sigma_inv = GPy.util.linalg.pdinv(self.Sigma_inv)
         self.diag_Sigma = np.diag(self.Sigma)
 
         #TODO: use woodbury for inverse? We don't get Ki though :(
@@ -78,6 +78,23 @@ class varEP(GPy.core.Model):
 
         C = np.sum(np.log(self.tilted.Z))
         return A + B + C
+
+    def alternative_log_likelihood(self):
+        """
+        the lower bound with KL[q||p(f|Ytilde)] added back in to make it look like EP
+        """
+        f_u = self.tilted.mean - self.mu
+        D = (.5 * self.num_data * np.log(2 * np.pi)
+              + np.sum(.5 * np.log(1. / self.beta + self.cavity_vars)
+                       + .5 * (self.Ytilde - self.cavity_means) ** 2 / (1. / self.beta + self.cavity_vars)))
+
+        return self.log_likelihood() \
+               -self.tilted.H.sum() \
+               + 0.5*self.num_data*np.log(2.*np.pi) \
+               - 0.5*self.log_det_Sigma_inv \
+               + 0.5*np.sum(self.Sigma_inv*(np.diag(self.tilted.var) + f_u[:,None]*f_u[None,:]))\
+               +D
+
 
     def _log_likelihood_gradients(self):
         """first compute gradients wrt cavity means/vars, then chain"""

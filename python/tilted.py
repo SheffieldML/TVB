@@ -91,7 +91,8 @@ class Probit(Tilted):
 
         self.dmean_dmu = (1 - self.sigma2/sigma2p1 * self.N_Z * (self.a + self.N_Z))
         
-        self.dN_dsigma2 = - self.N * self.a * da_dsigma2
+        self.dN_Z_dsigma2 = -self.N_Z*da_dsigma2*(self.N_Z + self.a)
+        
         self.dmean_dsigma2 = (self.Ysign*self.N_Z/np.sqrt(sigma2p1)
                            *(1+self.sigma2*(
                                 self.N_Z*self.Ysign*self.mu/(2*np.sqrt(sigma2p1))
@@ -155,19 +156,19 @@ if __name__=='__main__':
     m = GradientChecker(f,df,np.random.randn(N))
     m.checkgrad(verbose=1)
 
-	£ gradcheck dN_dsigma2    
-	def f(sigma2):
+    #gradcheck for var wrt mu
+    def f(sigma2):
         probit.set_cavity(mu, sigma2)
-        return probit.N
+        return probit.N_Z
     def df(sigma2):
         probit.set_cavity(mu, sigma2)
-        return probit.dN_dsigma2
+        return probit.dN_Z_dsigma2
     m = GradientChecker(f,df,np.random.rand(N))
-    print 'dN_dsigma2'  
-    m.checkgrad(verbose=1)
+    print 'N/Z wrt sigma2'
+    m.checkgrad(verbose=1)    
 
     #gradcheck for mean wrt sigma2
-	def f(sigma2):
+    def f(sigma2):
         probit.set_cavity(mu, sigma2)
         return probit.mean
     def df(sigma2):

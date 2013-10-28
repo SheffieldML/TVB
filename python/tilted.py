@@ -85,6 +85,7 @@ class Probit(Tilted):
         self.dZ_dmu = self.N*self.Ysign/np.sqrt(sigma2p1)
         self.dZ_dsigma2 = -0.5*self.N*self.Ysign*self.mu*np.power(sigma2p1, -1.5)
 
+
         self.dmean_dmu = (1 - self.sigma2/sigma2p1 * self.N_Z * (self.a + self.N_Z))
         self.dmean_dsigma2 = (self.Ysign*self.N_Z/np.sqrt(sigma2p1)
                            *(1+self.sigma2*(
@@ -93,9 +94,8 @@ class Probit(Tilted):
                                 -.5)
                              )/sigma2p1)
 
-        self.dvar_dmu = -((self.Ysign/np.sqrt(sigma2p1)) * (np.square(self.sigma2)/sigma2p1) * self.N_Z
-                         #* ((self.a + (self.Ysign/sigma2p1) + 2) * (self.N_Z + self.a)))
-                          * (1 + (self.a + 2*self.N_Z) * (self.N_Z + self.a)))
+        dN_Z_dmu = -self.Ysign/np.sqrt(sigma2p1)*(self.a*self.N_Z + self.N_Z2)
+        self.dvar_dmu = -self.sigma2**2/sigma2p1*(dN_Z_dmu*self.a + 2.*dN_Z_dmu*self.N_Z + self.N_Z*self.Ysign/np.sqrt(sigma2p1))
 
 
 if __name__=='__main__':

@@ -70,16 +70,19 @@ class Probit(Tilted):
 
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)
-        self.a = self.Ysign*self.mu/(np.sqrt(1+self.sigma2))
+        
+        sigma2p1 = 1 + self.sigma2
+        da_dsigma2 = -.5*self.Ysign*self.mu*np.power(sigma2p1,-3./2)
+        
+        self.a = self.Ysign*self.mu/(np.sqrt(sigma2p1))
+        
         self.Z = norm_cdf(self.a)
         self.N = norm_pdf(self.a)
         self.N_Z = self.N/self.Z
         self.N_Z2 = np.square(self.N_Z)
         self.N_Z3 = self.N_Z2*self.N_Z
-
-        sigma2p1 = 1 + self.sigma2
-
-        self.mean = self.mu + self.Ysign*self.sigma2*self.N_Z/np.sqrt(sigma2p1)
+        
+        self.mean = self.mu + self.Ysign*self.sigma2*self.N_Z/(np.sqrt(sigma2p1))
         self.var = self.sigma2*(1. - ((self.sigma2 * self.N_Z / sigma2p1) * (self.a + self.N_Z)))
 
         self.dZ_dmu = self.N*self.Ysign/np.sqrt(sigma2p1)
@@ -87,12 +90,18 @@ class Probit(Tilted):
 
 
         self.dmean_dmu = (1 - self.sigma2/sigma2p1 * self.N_Z * (self.a + self.N_Z))
+        
+        self.dN_dsigma2 = - self.N * self.a * da_dsigma2
         self.dmean_dsigma2 = (self.Ysign*self.N_Z/np.sqrt(sigma2p1)
                            *(1+self.sigma2*(
                                 self.N_Z*self.Ysign*self.mu/(2*np.sqrt(sigma2p1))
                                 +self.Ysign*self.a*self.mu/(self.Z*np.sqrt(sigma2p1))
                                 -.5)
-                             )/sigma2p1)
+                             )/sigma2p1) 
+        
+        self.dvar_dmu = -((self.Ysign/np.sqrt(sigma2p1)) * (np.square(self.sigma2)/sigma2p1) * self.N_Z
+                         #* ((self.a + (self.Ysign/sigma2p1) + 2) * (self.N_Z + self.a)))
+                          * (1 + (self.a + 2*self.N_Z) * (self.N_Z + self.a)))
 
         dN_Z_dmu = -self.Ysign/np.sqrt(sigma2p1)*(self.a*self.N_Z + self.N_Z2)
         self.dvar_dmu = -self.sigma2**2/sigma2p1*(dN_Z_dmu*self.a + 2.*dN_Z_dmu*self.N_Z + self.N_Z*self.Ysign/np.sqrt(sigma2p1))
@@ -106,6 +115,7 @@ class Probit(Tilted):
 if __name__=='__main__':
     N = 4
     Y = np.random.randint(2,size=N)
+    Y[Y==0] = -1
     probit = Probit(Y)
     mu = np.random.randn(N)
     sigma2 = np.random.rand(N)
@@ -150,14 +160,25 @@ if __name__=='__main__':
     m = GradientChecker(f,df,np.random.randn(N))
     m.checkgrad(verbose=1)
 
+	£ gradcheck dN_dsigma2    
+	def f(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.N
+    def df(sigma2):
+        probit.set_cavity(mu, sigma2)
+        return probit.dN_dsigma2
+    m = GradientChecker(f,df,np.random.rand(N))
+    print 'dN_dsigma2'  
+    m.checkgrad(verbose=1)
+
     #gradcheck for mean wrt sigma2
-    def f(sigma2):
+	def f(sigma2):
         probit.set_cavity(mu, sigma2)
         return probit.mean
     def df(sigma2):
         probit.set_cavity(mu, sigma2)
         return probit.dmean_dsigma2
-    m = GradientChecker(f,df,np.random.rand(N))
+    m = GradientChecker(f,df,np.random.rand(N))    
     m.checkgrad(verbose=1)
 
     #gradcheck for var wrt sigma2

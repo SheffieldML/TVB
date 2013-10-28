@@ -9,7 +9,13 @@ class Tilted(object):
     def set_cavity(self, mu, sigma2):
         self.mu, self.sigma2 = mu, sigma2
         self.sigma = np.sqrt(self.sigma2)
-
+    def _set_params(self, x):
+        pass
+    def _get_params(self):
+        return np.zeros(0)
+    def _get_param_names(self):
+        return []
+    
 def norm_cdf(x):
     return 0.5*(1+erf(x/np.sqrt(2.)))
 def norm_pdf(x):
@@ -21,12 +27,6 @@ class Heaviside(Tilted):
         Tilted.__init__(self,Y)
         self.Ysign = np.where(self.Y==1,1,-1)
         self.do_entropy = do_entropy
-    def _set_params(self, x):
-        pass
-    def _get_params(self):
-        return np.zeros(0)
-    def _get_param_names(self):
-        return []
 
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)

@@ -181,10 +181,9 @@ class varEP(GPy.core.Model):
         var = Kxx - np.sum(np.square(tmp), 0)
         return mu, var
 
-    def predict(self, Xnew):
+    def predict(self, Xnew, quantiles=[]):
         mu, var = self._predict_raw(Xnew)
-        #self.tilted.??
-        #TODO
+        self.tilted.predictive_values(mu, var)
 
 
     def plot_f(self):

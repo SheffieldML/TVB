@@ -28,6 +28,14 @@ class Heaviside(Tilted):
         self.Ysign = np.where(self.Y==1,1,-1)
         self.do_entropy = do_entropy
 
+    def pdf(self,X):
+        #shape of X should be N* x N, where N is self.N, N* is a grid of points to evaluate
+        diff = X - self.mu
+        cavity = np.exp(-0.5*np.log(2*np.pi) -0.5*np.log(self.sigma2) - np.square(X-self.mu)/self.sigma2)
+        likelihood = (X>0)*self.Y[None,:] + (X<0)*(1-self.Y)[None,:]
+        return cavity*likelihood#/self.Z[None,:]
+
+
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)
         self.a = self.Ysign*self.mu/self.sigma

@@ -82,18 +82,14 @@ class varEP(GPy.core.Model):
     def alternative_log_likelihood(self):
         """
         the lower bound with KL[q||p(f|Ytilde)] added back in to make it look like EP
-        """
-        f_u = self.tilted.mean - self.mu
-        D = (.5 * self.num_data * np.log(2 * np.pi)
-              + np.sum(.5 * np.log(1. / self.beta + self.cavity_vars)
-                       + .5 * (self.Ytilde - self.cavity_means) ** 2 / (1. / self.beta + self.cavity_vars)))
 
-        return self.log_likelihood() \
-               -self.tilted.H.sum() \
-               + 0.5*self.num_data*np.log(2.*np.pi) \
-               - 0.5*self.log_det_Sigma_inv \
-               + 0.5*np.sum(self.Sigma_inv*(np.diag(self.tilted.var) + f_u[:,None]*f_u[None,:]))\
-               +D
+        this is also equal to ln p(Ytilde) + ln Z
+        """
+        return -0.5*self.num_data*np.log(2*np.pi)\
+               +0.5*self.log_det_Sigma_inv\
+               -0.5*self.Sigma_inv.dot(self.Ytilde).dot(self.Ytilde)\
+               + np.sum(np.log(self.tilted.Z))
+
 
 
     def _log_likelihood_gradients(self):
@@ -198,27 +194,6 @@ class varEP(GPy.core.Model):
             Xtest,xx,yy, xymin, xymax = GPy.util.plot.x_frame2D(self.X)
             mu, var = self._predict_raw(Xtest)
             pb.contour(xx,yy,mu.reshape(*xx.shape))
-
-    def plot(self):
-        if self.X.shape[1]==1:
-            pb.figure()
-            Xtest, xmin, xmax = GPy.util.plot.x_frame1D(self.X)
-            mu, var = self._predict_raw(Xtest)
-
-            #GPy.util.plot.gpplot(Xtest, mu, mu - 2*np.sqrt(var), mu + 2*np.sqrt(var))
-            pb.plot(self.X, self.Y, 'kx', mew=1)
-            pb.plot(Xtest, 0.5*(1+erf(mu/np.sqrt(2.*var))), linewidth=2)
-            pb.ylim(-.1, 1.1)
-        elif self.X.shape[1]==2:
-            pb.figure()
-            Xtest,xx,yy, xymin, xymax = GPy.util.plot.x_frame2D(self.X)
-            p = self.predict(Xtest)
-            c = pb.contour(xx,yy,p.reshape(*xx.shape), [0.1, 0.25, 0.5, 0.75, 0.9], colors='k')
-            pb.clabel(c)
-            i1 = self.Y==1
-            pb.plot(self.X[:,0][i1], self.X[:,1][i1], 'rx', mew=2, ms=8)
-            i2 = self.Y==0
-            pb.plot(self.X[:,0][i2], self.X[:,1][i2], 'wo', mew=2, mec='b')
 
 
     def natgrad(self):

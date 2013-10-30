@@ -29,10 +29,15 @@ class quad_tilt(Tilted):
 
     def _set_params(self, x):
         self.lik._set_params(x)
+
     def _get_params(self):
         return self.lik._get_params()
+
     def _get_param_names(self):
         return self.lik._get_param_names()
+
+    def predictive_values(self, mu, var, quantiles):
+        return self.likelihood.predictive_values(mu, var, quantiles)
 
 
     def set_cavity(self, mu, sigma2):
@@ -74,6 +79,11 @@ class quad_tilt(Tilted):
         #derivatives of the variance wrt cavity mean, var
         self.dvar_dmu = (self.Ex3 - self.mean*self.Ex2)/self.sigma2 - 2.*self.mean*self.dmean_dmu
         self.dvar_dsigma2 = -0.5*self.Ex2/self.sigma2 + 0.5/self.sigma2**2*(self.Ex4 + self.Ex2*self.mu**2 - 2.*self.Ex3*self.mu) - self.Ex2*self.dZ_dsigma2/self.Z - 2*self.mean*self.dmean_dsigma2
+
+    def pdf(self,X):
+        lik = np.vstack([self.lik.pdf(x,y) for x, y in zip(X.T, self.Y)]).T
+        cavity = np.exp(-0.5*np.log(2*np.pi) -0.5*np.log(self.sigma2) - np.square(X-self.mu)/self.sigma2)
+        return lik*cavity
 
     def plot(self, index=0):
         pb.figure()

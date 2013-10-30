@@ -85,20 +85,26 @@ class varEP(GPy.core.Model):
 
         this is also equal to ln p(Ytilde) + ln Z
         """
+        A = self.K + np.diag(1./self.beta)
+        Ai, L, Li, log_det = GPy.util.linalg.pdinv(A)
+        Ai_ = self.Ki - self.Ki.dot(self.Sigma).dot(self.Ki)
+        stop
+        log_det = self.K_logdet + self.log_det_Sigma_inv - np.sum(np.log(self.beta))
+
+        return -0.5*self.num_data*np.log(2*np.pi)\
+                -0.5*log_det - 0.5*Ai.dot(self.Ytilde).dot(self.Ytilde)
+
+
         return -0.5*self.num_data*np.log(2*np.pi)\
                +0.5*self.log_det_Sigma_inv\
                -0.5*self.Sigma_inv.dot(self.Ytilde).dot(self.Ytilde)\
                + np.sum(np.log(self.tilted.Z))
 
-<<<<<<< HEAD
-=======
         return self.log_likelihood() \
                -self.tilted.H.sum() \
                + 0.5*self.num_data*np.log(2.*np.pi) \
                - 0.5*self.log_det_Sigma_inv \
                + 0.5*np.sum(self.Sigma_inv*(np.diag(self.tilted.var) + f_u[:,None]*f_u[None,:]))\
-               + D
->>>>>>> bc78598d6c79f88074e57fb15bf06d7b9ca3f237
 
 
     def _log_likelihood_gradients(self):
@@ -188,7 +194,7 @@ class varEP(GPy.core.Model):
 
     def predict(self, Xnew, quantiles=[]):
         mu, var = self._predict_raw(Xnew)
-        self.tilted.predictive_values(mu, var)
+        return self.tilted.predictive_values(mu, var)
 
 
     def plot_f(self):

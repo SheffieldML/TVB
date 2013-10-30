@@ -15,7 +15,7 @@ class Tilted(object):
         return np.zeros(0)
     def _get_param_names(self):
         return []
-    
+
 def norm_cdf(x):
     return 0.5*(1+erf(x/np.sqrt(2.)))
 def norm_pdf(x):
@@ -35,6 +35,8 @@ class Heaviside(Tilted):
         likelihood = (X>0)*self.Y[None,:] + (X<0)*(1-self.Y)[None,:]
         return cavity*likelihood#/self.Z[None,:]
 
+    def predict(self, mu, var):
+        return 0.5*(1+erf(mu/np.sqrt(2.*var)))
 
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)
@@ -75,7 +77,10 @@ class Probit(Tilted):
     def __init__(self, Y):
         super(Probit, self).__init__(Y)
         self.Ysign = np.where(self.Y==1,1,-1)
-
+    
+    def predict(self, mu, var):
+        return 0.5*(1+erf(mu/np.sqrt(2.*(var+1))))
+        
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)
         

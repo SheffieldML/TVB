@@ -20,7 +20,7 @@ class classification(varEP):
 
     def predict(self, Xnew):
         mu, var = self._predict_raw(Xnew)
-        return 0.5*(1+erf(mu/np.sqrt(2.*var)))
+        return self.tilted.predict(mu, var)
 
     def plot(self):
         if self.X.shape[1]==1:

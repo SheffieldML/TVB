@@ -57,29 +57,31 @@ def grid(np):
     return gridsize, l, a
 
 def save_plots(folder):
-    for figname in ['EP', 'EP info', 'tVB', 'tVB info']:
+    for figname in ['EP', 'EP_info', 'tVB', 'tVB_info']:
         pb.figure(figname)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
         pb.savefig(os.path.join(folder, "{}.pdf".format(figname)))
 
-def plot_all(folder):
+def plot_all(folder, save):
     pb.close('all')
     train, test = load_stats(folder)
     _, l, a = grid(np)
     plot_max(train, l, a, 'tVB', 'tVB')
     plot_max(train, l, a, 'EP', 'EP')
-    plot_max(test, l, a, 'EP', 'EP info')
-    plot_max(test, l, a, 'tVB', 'tVB info')
-    save_plots(folder)
+    plot_max(test, l, a, 'EP', 'EP_info')
+    plot_max(test, l, a, 'tVB', 'tVB_info')
+    save_plots(os.path.join(save, folder))
 
 if __name__ == '__main__':
     pb.close('all')
     seed = np.random.randint(1e6)
     link_name = sys.argv[1]
     N = 200
-    white = 2
+    white = 1
 
     # read in the data:
-    if 0:
+    if 1:
         data = np.loadtxt("ionosphere.dat", str, delimiter=',')
         data_name = "ionosphere"
         X = np.array(data[:, 2:34], dtype=float)
@@ -121,54 +123,44 @@ if __name__ == '__main__':
     kern = GPy.kern.rbf(Xtrain.shape[1]) + GPy.kern.white(Xtrain.shape[1])
 
     #set up the tVB model
-    m = class2(Xtrain, Ytrain, kern, link=link_name)
-    m.tilted.do_entropy = False
+    ln = link_name
+    if link_name == "L_EP":
+        ln = 'heaviside'
+    m = class2(Xtrain, Ytrain, kern, link=ln)
+    m.tilted.do_entropy = link_name == "L_EP"
     m.no_K_grads_please = True
 
     #set up the EP model
     if link_name == 'heaviside':
         link = GPy.likelihoods.noise_models.gp_transformations.Heaviside()
-    else:
+    elif link_name == "probit":
         link = GPy.likelihoods.noise_models.gp_transformations.Probit()
+    elif link_name == 'L_EP':
+        link = GPy.likelihoods.noise_models.gp_transformations.Heaviside()
     lik = GPy.likelihoods.binomial(link)
     m_ep = GPy.models.GPClassification(Xtrain, Ytrain.reshape(-1,1), kernel=kern.copy())
 
     #loop!
     Z_tVB = np.zeros((gridsize, gridsize))
-    Z_tVB_alt = np.zeros((gridsize, gridsize))
     Z_EP = np.zeros((gridsize, gridsize))
-<<<<<<< HEAD
     pred_tVB = np.zeros((gridsize, gridsize))
     pred_EP = np.zeros((gridsize, gridsize))
         
-=======
-    def single_point(l,a, m, m_ep):
-        #do the tVB model first
-        m.constrain_fixed('rbf_len', np.exp(ll))
-        m.constrain_fixed('rbf_var', np.exp(aa))
-        m.constrain_fixed('white', 1e-6)
-        m.randomize()
-        m.optimize('bfgs', messages=0)#, bfgs_factor=1e20)
-        #Z_tVB_alt[i,j] = m.alternative_log_likelihood()
-            #Do EP
-        m_ep._set_params(np.array([np.exp(aa), np.exp(ll), 1e-6]))
-        m_ep.update_likelihood_approximation()
-
->>>>>>> ca0141651b63a029e773ecebbfec60d90e3102d4
     for i in range(gridsize):
         for j in range(gridsize):
             aa = a[i,j]
             ll = l[i,j]
             print "Doing point: {:.2} {:.2}".format(ll, aa)
-<<<<<<< HEAD
             #do the tVB model first
             m.constrain_fixed('rbf_len', np.exp(ll))
             m.constrain_fixed('rbf_var', np.exp(aa))
             m.constrain_fixed('white', white)
             m.randomize()
             m.optimize('scg', messages=0, max_iters=2e4)#, bfgs_factor=1e20)
-            #Z_tVB[i,j] =  m.alternative_log_likelihood()
-            Z_tVB[i,j] =  m.log_likelihood()
+            if link_name == "L_EP":
+                Z_tVB[i,j] =  m.alternative_log_likelihood()
+            else:
+                Z_tVB[i,j] =  m.log_likelihood()
             p = m.predict(Xtest)
             pred_tVB[i,j] = np.where(Ytest==1, np.log(p), np.log(1.-p)).mean()
             #Z_tVB_alt[i,j] = m.alternative_log_likelihood()
@@ -200,24 +192,3 @@ if __name__ == '__main__':
              Xtest=Xtest, Xtrain=Xtrain, Ytest=Ytest, Ytrain=Ytrain,
              Z_EP=Z_EP, pred_EP=pred_EP, Z_tVB=Z_tVB, pred_tVB=pred_tVB,
              seed=seed, l=l, a=a, gridsize=gridsize)
-=======
-            Z_EP[i,j] = m_ep.log_likelihood()
-            Z_tVB[i,j] =  m.log_likelihood()
-
-
-    pb.figure('tVB')
-    c = pb.contour(l,a,Z_tVB, 10, colors='k', linestyles='solid')
-    pb.clabel(c)
-    pb.imshow(Z_tVB, extent=[0,5,0,6], origin='lower')
-
-    #pb.figure('tVB_alt')
-    #c = pb.contour(l,a,Z_tVB_alt, 10, color='k')
-    #pb.imshow(Z_tVB_alt, extent=[0,5,0,6], origin='lower')
-    #pb.clabel(c)
-
-    pb.figure('EP')
-    c = pb.contour(l,a,Z_EP, 10, colors='k', linestyles='solid')
-    pb.imshow(Z_EP, extent=[0,5,0,6], origin='lower')
-    pb.clabel(c)
-
->>>>>>> ca0141651b63a029e773ecebbfec60d90e3102d4

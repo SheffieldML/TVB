@@ -23,10 +23,10 @@ class student_t():
         dlamb =  0.5/self.lamb - 0.5*(self.nu + 1.)*(x2/self.nu/(1.+self.lamb*x2/self.nu))
         return np.vstack((dnu, dlamb))
 
-    def predictive_values(self, mu, var, quantiles):
-        if len(quantiles)==0:
+    def predictive_values(self, mu, var, percentiles):
+        if len(percentiles)==0:
             return mu, []
-        samples = (np.random.randn(10000,*mu.shape) + mu)*np.sqrt(var)
-        TODO!!
-        qs = [stats.scoreatpercentile(samples,q) for q in quantiles]
-        return mu, qs
+        samples = (np.random.randn(40e3,*mu.shape) + mu)*np.sqrt(var)
+        samples = stats.t.rvs(self.nu, loc=samples, scale=np.array(self.lamb).reshape(1,1))
+        qs = [stats.scoreatpercentile(samples,q,axis=0) for q in percentiles]
+        return samples.mean(0), qs

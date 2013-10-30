@@ -8,6 +8,7 @@ from IPython import parallel
 from functools import partial
 
 from likelihoods import student_t
+import pylab
 
 class quad_tilt(Tilted):
     def __init__(self, Y, in_parallel=False):
@@ -36,8 +37,8 @@ class quad_tilt(Tilted):
     def _get_param_names(self):
         return self.lik._get_param_names()
 
-    def predictive_values(self, mu, var, quantiles):
-        return self.likelihood.predictive_values(mu, var, quantiles)
+    def predictive_values(self, mu, var, percentiles):
+        return self.lik.predictive_values(mu, var, percentiles)
 
 
     def set_cavity(self, mu, sigma2):
@@ -107,15 +108,29 @@ if __name__=='__main__':
     # some data
     N = 800
     Y = np.random.randn(N)
-
+    Y.sort()
+    Y = np.sin(Y)
+    
     # some cavity distributions:
-    mu = np.random.randn(N)*10
-    var = np.exp(np.random.randn(N))
+    x = np.r_[-5:5:100j]
+    mu = np.sin(x)
+    var = np.exp(x * .3)#np.exp(np.random.randn(N))
+    
+    t = quad_tilt(Y,in_parallel=False)
+    mu, q = t.predictive_values(mu, var, [20,80])
+
+    pylab.figure()
+    pylab.plot(x,mu,lw=2,color='g')
+    pylab.fill_between(x, q[0], q[1],alpha=.3, color='k')
+    pylab.fill_between(x, mu-1.281551565545*np.sqrt(var), mu+1.281551565545*np.sqrt(var),alpha=.3, color='r')
+
+
+    import ipdb;ipdb.set_trace()
 
     #a base class for checking the gradient
     class cg(GPy.core.Model):
-        def __init__(self,y, mu, var):
-            self.tilted = quad_tilt(y,in_parallel=True)
+        def __init__(self,y, mu, var, in_parallel=True):
+            self.tilted = quad_tilt(y,in_parallel=in_parallel)
             self.tilted.set_cavity(mu, var)
             self.N = y.size
             GPy.core.Model.__init__(self)

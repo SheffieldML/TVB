@@ -27,7 +27,10 @@ class Heaviside(Tilted):
         Tilted.__init__(self,Y)
         self.Ysign = np.where(self.Y==1,1,-1)
         self.do_entropy = do_entropy
-
+    
+    def predict(self, mu, var):
+        return 0.5*(1+erf(mu/np.sqrt(2.*var)))
+        
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)
         self.a = self.Ysign*self.mu/self.sigma
@@ -67,7 +70,10 @@ class Probit(Tilted):
     def __init__(self, Y):
         super(Probit, self).__init__(Y)
         self.Ysign = np.where(self.Y==1,1,-1)
-
+    
+    def predict(self, mu, var):
+        return 0.5*(1+erf(mu/np.sqrt(2.*(var+1))))
+        
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)
         

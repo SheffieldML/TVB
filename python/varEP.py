@@ -93,7 +93,7 @@ class varEP(GPy.core.Model):
                + 0.5*self.num_data*np.log(2.*np.pi) \
                - 0.5*self.log_det_Sigma_inv \
                + 0.5*np.sum(self.Sigma_inv*(np.diag(self.tilted.var) + f_u[:,None]*f_u[None,:]))\
-               +D
+               + D
 
 
     def _log_likelihood_gradients(self):

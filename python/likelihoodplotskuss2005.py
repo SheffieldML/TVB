@@ -137,14 +137,30 @@ if __name__ == '__main__':
     Z_tVB = np.zeros((gridsize, gridsize))
     Z_tVB_alt = np.zeros((gridsize, gridsize))
     Z_EP = np.zeros((gridsize, gridsize))
+<<<<<<< HEAD
     pred_tVB = np.zeros((gridsize, gridsize))
     pred_EP = np.zeros((gridsize, gridsize))
         
+=======
+    def single_point(l,a, m, m_ep):
+        #do the tVB model first
+        m.constrain_fixed('rbf_len', np.exp(ll))
+        m.constrain_fixed('rbf_var', np.exp(aa))
+        m.constrain_fixed('white', 1e-6)
+        m.randomize()
+        m.optimize('bfgs', messages=0)#, bfgs_factor=1e20)
+        #Z_tVB_alt[i,j] = m.alternative_log_likelihood()
+            #Do EP
+        m_ep._set_params(np.array([np.exp(aa), np.exp(ll), 1e-6]))
+        m_ep.update_likelihood_approximation()
+
+>>>>>>> ca0141651b63a029e773ecebbfec60d90e3102d4
     for i in range(gridsize):
         for j in range(gridsize):
             aa = a[i,j]
             ll = l[i,j]
             print "Doing point: {:.2} {:.2}".format(ll, aa)
+<<<<<<< HEAD
             #do the tVB model first
             m.constrain_fixed('rbf_len', np.exp(ll))
             m.constrain_fixed('rbf_var', np.exp(aa))
@@ -184,3 +200,24 @@ if __name__ == '__main__':
              Xtest=Xtest, Xtrain=Xtrain, Ytest=Ytest, Ytrain=Ytrain,
              Z_EP=Z_EP, pred_EP=pred_EP, Z_tVB=Z_tVB, pred_tVB=pred_tVB,
              seed=seed, l=l, a=a, gridsize=gridsize)
+=======
+            Z_EP[i,j] = m_ep.log_likelihood()
+            Z_tVB[i,j] =  m.log_likelihood()
+
+
+    pb.figure('tVB')
+    c = pb.contour(l,a,Z_tVB, 10, colors='k', linestyles='solid')
+    pb.clabel(c)
+    pb.imshow(Z_tVB, extent=[0,5,0,6], origin='lower')
+
+    #pb.figure('tVB_alt')
+    #c = pb.contour(l,a,Z_tVB_alt, 10, color='k')
+    #pb.imshow(Z_tVB_alt, extent=[0,5,0,6], origin='lower')
+    #pb.clabel(c)
+
+    pb.figure('EP')
+    c = pb.contour(l,a,Z_EP, 10, colors='k', linestyles='solid')
+    pb.imshow(Z_EP, extent=[0,5,0,6], origin='lower')
+    pb.clabel(c)
+
+>>>>>>> ca0141651b63a029e773ecebbfec60d90e3102d4

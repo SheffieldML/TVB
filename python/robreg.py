@@ -7,9 +7,9 @@ from integrate import integrate
 import pylab as pb
 
 class robreg(varEP):
-    def __init__(self, X, Y, kern=None):
+    def __init__(self, X, Y, kern=None, in_parallel=False):
         self.Y = Y
-        varEP.__init__(self, X, quad_tilt(Y.flatten()) , kern)
+        varEP.__init__(self, X, quad_tilt(Y.flatten(), in_parallel=in_parallel) , kern)
 
     def predict(self, Xnew):
         mu, var = self._predict_raw(Xnew)

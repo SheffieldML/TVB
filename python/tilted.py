@@ -1,7 +1,7 @@
 import numpy as np
 import pylab as pb
 from scipy.special import erf
-from GPy.models.gradient_checker import GradientChecker
+from GPy.models import GradientChecker
 
 class Tilted(object):
     def __init__(self, Y):

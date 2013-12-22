@@ -2,7 +2,6 @@ import numpy as np
 import pylab as pb
 from scipy.stats import norm as scipynorm
 from scipy import special
-from GPy.models.gradient_checker import GradientChecker
 import itertools
 from GPy.core.model import Model
 pb.ion()

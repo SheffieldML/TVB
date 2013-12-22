@@ -3,18 +3,18 @@ import pylab as pb
 pb.ion()
 import GPy
 from truncnorm import truncnorm
-from GPy.models.gradient_checker import GradientChecker
 from scipy.special import erf
 import tilted
 from varEP import varEP
+from varEP2 import varEP as varEP2
 
-class classification(varEP):
+class classification(varEP2):
     def __init__(self, X, Y, kern=None, link='probit'):
         self.Y = Y
         if link=='probit':
-            varEP.__init__(self,X, tilted.Probit(Y.flatten()), kern)
+            varEP2.__init__(self,X, tilted.Probit(Y.flatten()), kern)
         elif link=='heaviside':
-            varEP.__init__(self,X, tilted.Heaviside(Y.flatten()), kern)
+            varEP2.__init__(self,X, tilted.Heaviside(Y.flatten()), kern)
         else:
             raise ValueError('bad link name')
 
@@ -54,7 +54,7 @@ if __name__=='__main__':
 
     #build and optimize a model
     m = classification(X, Y)
-    #m.randomize();     m.checkgrad(verbose=True)
-    m.randomize()
-    m.optimize('bfgs')
-    m.plot()
+    m.randomize();     m.checkgrad(verbose=True)
+    #m.randomize()
+    #m.optimize('bfgs')
+    #m.plot()

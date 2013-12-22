@@ -6,6 +6,9 @@ from scipy.special import erf
 import tilted
 
 class varEP(GPy.core.Model):
+    """
+    Exaclty the same as varEP, but we use the marginal here, not the cavity. 
+    """
     def __init__(self, X, tilted, kern=None):
         #accept the construction arguments
         self.X = X
@@ -37,21 +40,12 @@ class varEP(GPy.core.Model):
         self.Ki, self.L, _,self.K_logdet = GPy.util.linalg.pdinv(self.K)
         self.Sigma_inv = self.Ki + np.diag(self.beta)
         self.Sigma,_,_,self.log_det_Sigma_inv = GPy.util.linalg.pdinv(self.Sigma_inv)
-        self.diag_Sigma = np.diag(self.Sigma)
 
-        #TODO: use woodbury for inverse? We don't get Ki though :(
-        #tmp = self.K + np.diag(1./self.beta)
-        #L = GPy.util.linalg.jitchol(tmp)
-        #LiK,_ = GPy.util.linalg.dtrtrs(L,self.K, lower=1)
-        #self.Sigma_ = self.K - np.dot(LiK.T, LiK)
-        #LiLiK,_ = GPy.util.linalg.dtrtrs(L, LiK, lower=1, trans=1)
-        #self.SigmaKi_ = np.eye(self.num_data) - LiLiK.T
 
-        self.mu = np.dot(self.Sigma, self.beta*self.Ytilde )
-
-        #compute cavity means, vars (all at once!)
-        self.cavity_vars = 1./(1./self.diag_Sigma - self.beta)
-        self.cavity_means = self.cavity_vars * (self.mu/self.diag_Sigma - self.Ytilde*self.beta)
+        #compute 'cavity' means, vars (marginals, really not cavity)
+        self.cavity_means = np.dot(self.Sigma, self.beta*self.Ytilde )
+        self.cavity_vars = np.diag(self.Sigma)
+        #note that the cavity mean is now the posterior mean, and that the cavity var is the marginal posterior var.
 
         #compute tilted distributions...
         self.tilted.set_cavity(self.cavity_means, self.cavity_vars)
@@ -69,53 +63,17 @@ class varEP(GPy.core.Model):
         #ignore log 2 pi terms, they cancel.
 
         #expectation of log prior under q
-        tmp, _ = GPy.util.linalg.dtrtrs(self.L,self.tilted.mean, lower=1)
+        tmp, _ = GPy.util.linalg.dtrtrs(self.L, self.tilted.mean, lower=1)
         A = -0.5*self.K_logdet -0.5*np.sum(np.square(tmp)) - 0.5*np.sum(np.diag(self.Ki)*self.tilted.var)
 
         #expectation of the (negative) log cavity
         B = 0.5*np.sum(np.log(self.cavity_vars)) + 0.5*np.sum(np.square(self.cavity_means - self.tilted.mean)/self.cavity_vars) + 0.5*np.sum(self.tilted.var/self.cavity_vars)
 
         C = np.sum(np.log(self.tilted.Z))
-        return A + B + C
-
-    def alternative_log_likelihood(self):
-        """
-        the lower bound with KL[q||p(f|Ytilde)] added back in to make it look like EP
-
-        this is also equal to ln p(Ytilde) + ln Z
-        """
-        A = self.K + np.diag(1./self.beta)
-        Ai, L, Li, log_det = GPy.util.linalg.pdinv(A)
-        Ai_ = self.Ki - self.Ki.dot(self.Sigma).dot(self.Ki)
-        stop
-        log_det = self.K_logdet + self.log_det_Sigma_inv - np.sum(np.log(self.beta))
-
-        return -0.5*self.num_data*np.log(2*np.pi)\
-                -0.5*log_det - 0.5*Ai.dot(self.Ytilde).dot(self.Ytilde)
-
-
-        return -0.5*self.num_data*np.log(2*np.pi)\
-               +0.5*self.log_det_Sigma_inv\
-               -0.5*self.Sigma_inv.dot(self.Ytilde).dot(self.Ytilde)\
-               + np.sum(np.log(self.tilted.Z))
-
-        return self.log_likelihood() \
-               -self.tilted.H.sum() \
-               + 0.5*self.num_data*np.log(2.*np.pi) \
-               - 0.5*self.log_det_Sigma_inv \
-               + 0.5*np.sum(self.Sigma_inv*(np.diag(self.tilted.var) + f_u[:,None]*f_u[None,:]))\
-
+        return A+B+C
 
     def _log_likelihood_gradients(self):
         """first compute gradients wrt cavity means/vars, then chain"""
-
-        # partial derivatives: watch the broadcast!
-        dcav_vars_dbeta = -(self.Sigma**2 / self.diag_Sigma**2 - np.eye(self.num_data) )*self.cavity_vars**2 # correct!
-        dcav_means_dYtilde = (self.Sigma * self.beta[:, None] / self.diag_Sigma - np.diag(self.beta)) * self.cavity_vars # correct!
-
-        dcav_means_dbeta = dcav_vars_dbeta * (self.mu / self.diag_Sigma - self.Ytilde * self.beta)
-        tmp = self.Sigma / self.diag_Sigma
-        dcav_means_dbeta += (tmp*(self.Ytilde[:,None] - self.mu[:,None]) + tmp**2*self.mu - np.diag(self.Ytilde))*self.cavity_vars
 
         #first compute gradietn wrt cavity parameters, then chain
         #A
@@ -138,6 +96,10 @@ class varEP(GPy.core.Model):
         dC_dcav_means = self.tilted.dZ_dmu/self.tilted.Z
         dC_dcav_vars = self.tilted.dZ_dsigma2/self.tilted.Z
 
+        # partial derivatives
+        dcav_vars_dbeta = -self.Sigma**2
+        dcav_means_dYtilde = self.Sigma*self.beta[:,None]
+        dcav_means_dbeta = self.Sigma*(self.Ytilde - self.cavity_means)[:,None]
 
         #sum gradients from all the different parts
         dL_dcav_vars = dA_dcav_vars + dB_dcav_vars + dC_dcav_vars
@@ -150,16 +112,11 @@ class varEP(GPy.core.Model):
         if self.no_K_grads_please:
             dL_dtheta = np.zeros(self.kern.num_params_transformed())
         else:
-            #the symmetric parts
-            tmp = dL_dcav_vars*np.square(self.cavity_vars/self.diag_Sigma)
-            tmp += dL_dcav_means*(self.cavity_means - self.mu)*self.cavity_vars/np.square(self.diag_Sigma)
             KiSigma = np.dot(self.Ki, self.Sigma)
 
-            tmp = KiSigma*tmp
-            dL_dK = np.dot(tmp, KiSigma.T)
-
-            #the non-symmetric parts
-            dL_dK += (np.dot(self.Ki, self.mu)[:,None] * (dL_dcav_means*self.cavity_vars/self.diag_Sigma)[None,:]).dot(KiSigma.T)
+            # via Sigma_diag (cav_vars), and via mu (cav_means)
+            tmp = (self.beta*self.Ytilde)[:,None]*dL_dcav_means + np.diag(dL_dcav_vars)
+            dL_dK = np.dot(KiSigma, tmp).dot(KiSigma.T)
 
             #the 'direct' part
             dL_dK -= .5 * self.Ki # for the log det.
@@ -186,7 +143,7 @@ class varEP(GPy.core.Model):
         L = GPy.util.linalg.jitchol(self.K + np.diag(1./self.beta))
         tmp, _ = GPy.util.linalg.dpotrs(L, self.Ytilde, lower=1)
         mu = np.dot(Kx, tmp)
-        mu_ = np.dot(Kx, self.Ki).dot(self.mu)
+        #mu_ = np.dot(Kx, self.Ki).dot(self.mu)
         tmp, _ = GPy.util.linalg.dtrtrs(L, Kx.T, lower=1)
         var = Kxx - np.sum(np.square(tmp), 0)
         return mu, var
@@ -208,51 +165,5 @@ class varEP(GPy.core.Model):
             Xtest,xx,yy, xymin, xymax = GPy.util.plot.x_frame2D(self.X)
             mu, var = self._predict_raw(Xtest)
             pb.contour(xx,yy,mu.reshape(*xx.shape))
-
-
-    def natgrad(self):
-        grads = self._log_likelihood_gradients()
-        dL_dYtilde = grads[:self.num_data]
-        dL_dbeta = grads[self.num_data:2*self.num_data]
-
-        ll_old = self.log_likelihood()
-        beta_old = self.beta.copy()
-        Ytilde_old = self.Ytilde.copy()
-
-        steplength = 1e-2
-        for i in range(100):
-
-            #which!?
-            beta_new = self.beta + steplength*2.*np.diag(np.dot(self.Sigma_inv*dL_dbeta, self.Sigma_inv))
-            beta_new = np.clip(beta_new, 1e-3, 1e3)
-
-
-            By_new = self.beta*self.Ytilde + steplength*np.dot(self.Sigma_inv/self.beta.reshape(-1,1),dL_dYtilde)
-            y_new = By_new/beta_new
-
-            self.Ytilde = y_new
-            self.beta = beta_new
-            self._set_params(self._get_params())
-
-            ll_new = self.log_likelihood()
-            if (ll_new<ll_old) or np.isnan(ll_new):
-                #step failed: reduce steplength and try again
-                self.beta = beta_old
-                self.Ytilde = Ytilde_old
-                steplength /= 2.
-
-                print i, ll_new, '(failed, reducing step length)'
-            else:
-                #sucess!
-                print i, ll_new
-                if (ll_new - ll_old) < 1e-6:
-                    break # terminate
-                ll_old = self.log_likelihood()
-                beta_old = self.beta.copy()
-                Ytilde_old = self.Ytilde.copy()
-
-                steplength *= 1.1
-
-
 
 

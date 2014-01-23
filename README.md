@@ -7,6 +7,8 @@ distribution.
 Here we have implemented TVB for inference in Gaussian process classifiacation
 and robust regression. 
 
+Citation
+--------
 Our paper has been accepted for publication at AISTATS. Here's the citation-to-be:
 
 ```

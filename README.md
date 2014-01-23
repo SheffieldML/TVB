@@ -11,7 +11,7 @@ Citation
 --------
 Our paper has been accepted for publication at AISTATS. Here's the citation-to-be:
 
-```
+```TeX
 @inproceedings{hensman2014tilted,
   title={Tilted Variational Bayes},
   author={Hensman, James and Zwie\ss ele, Max and Lawrence, Neil D.},
@@ -23,7 +23,7 @@ Our paper has been accepted for publication at AISTATS. Here's the citation-to-b
 
 Dependencies
 ------------
-This code depends on our open source project GPy: github.com/SheffieldML/GPy
+This code depends on our open source project GPy: http://github.com/SheffieldML/GPy
 
 License
 -------

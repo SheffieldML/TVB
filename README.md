@@ -9,13 +9,15 @@ and robust regression.
 
 Our paper has been accepted for publication at AISTATS. Here's the citation-to-be:
 
-  @inproceedings{hensman2014tilted, 
-    title={Tilted Variational Bayes}, 
-    author={Hensman, James and Zwie\ss ele, Max and Lawrence, Neil D.}, 
-    booktitle={International Conference on Artificial Intelligence and Statistics}, 
-    publisher={JMLR W\&CP}, 
-    year={2014} 
-  }
+```
+@inproceedings{hensman2014tilted,
+  title={Tilted Variational Bayes},
+  author={Hensman, James and Zwie\ss ele, Max and Lawrence, Neil D.},
+  booktitle={International Conference on Artificial Intelligence and Statistics},
+  publisher={JMLR W\&CP},
+  year={2014}
+}
+```
 
 Dependencies
 ------------

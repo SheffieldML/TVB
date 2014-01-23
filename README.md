@@ -21,6 +21,8 @@ Our paper has been accepted for publication at AISTATS. Here's the citation-to-b
 }
 ```
 
+You can download a copy of the (almost) final paper, with supplementary material attached here: http://staffwww.dcs.sheffield.ac.uk/people/J.Hensman/hensman_2014_TVB.pdf
+
 Dependencies
 ------------
 This code depends on our open source project GPy: http://github.com/SheffieldML/GPy

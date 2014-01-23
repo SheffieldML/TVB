@@ -4,6 +4,7 @@ pb.ion()
 pb.close('all')
 import GPy
 from classification2 import classification
+np.random.seed(0)
 
 d = np.loadtxt('../data/banana-5-1tra.dat', skiprows=7, delimiter=',')
 d = d[:300]
@@ -20,7 +21,7 @@ pb.title('variational EP')
 
 #build an EP model
 link = GPy.likelihoods.noise_models.gp_transformations.Heaviside()
-lik = GPy.likelihoods.binomial(link)
+lik = GPy.likelihoods.bernoulli(link)
 l = GPy.likelihoods.EP(Y.reshape(-1,1),lik)
 m_ep1 = GPy.models.GPClassification(X,likelihood=l, kernel = m.kern.copy())
 m_ep1.update_likelihood_approximation()

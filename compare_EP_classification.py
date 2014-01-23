@@ -1,3 +1,6 @@
+# Copyright (c) 2014, James Hensman
+# Distributed under the terms of the GNU General public License, see LICENSE.txt
+
 import numpy as np
 import pylab as pb
 from scipy.io import loadmat

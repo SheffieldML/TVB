@@ -1,3 +1,6 @@
+# Copyright (c) 2014, James Hensman, Max Zwiessele
+# Distributed under the terms of the GNU General public License, see LICENSE.txt
+
 '''
 Created on 12 Sep 2013
 

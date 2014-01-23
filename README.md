@@ -7,8 +7,7 @@ distribution.
 Here we have implemented TVB for inference in Gaussian process classifiacation
 and robust regression. 
 
-
-Out paper has been accepted for publication at AISTATS. Here's the citation-to-be:
+Our paper has been accepted for publication at AISTATS. Here's the citation-to-be:
 
 @inproceedings{hensman2014tilted,
   title={Tilted Variational Bayes},
@@ -17,3 +16,12 @@ Out paper has been accepted for publication at AISTATS. Here's the citation-to-b
   publisher={JMLR W\&CP},
   year={2014}
 }
+
+DEPENDENCIES
+============
+This code depends on our open source project GPy: github.com/SheffieldML/GPy
+
+LICENSE
+=======
+The code is released under the GNU GPL (see LICENSE.txt). 
+

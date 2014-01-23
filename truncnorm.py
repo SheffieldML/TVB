@@ -1,3 +1,6 @@
+# Copyright (c) 2014, James Hensman, Max Zwiessele
+# Distributed under the terms of the GNU General public License, see LICENSE.txt
+
 import numpy as np
 import pylab as pb
 from scipy.stats import norm as scipynorm

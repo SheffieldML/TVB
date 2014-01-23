@@ -1,3 +1,6 @@
+# Copyright (c) 2014, James Hensman
+# Distributed under the terms of the GNU General public License, see LICENSE.txt
+
 import numpy as np
 import pylab as pb
 pb.ion()
@@ -55,6 +58,6 @@ if __name__=='__main__':
     #build and optimize a model
     m = classification(X, Y)
     m.randomize();     m.checkgrad(verbose=True)
-    #m.randomize()
-    #m.optimize('bfgs')
-    #m.plot()
+    m.randomize()
+    m.optimize('bfgs')
+    m.plot()

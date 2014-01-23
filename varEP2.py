@@ -7,7 +7,7 @@ import tilted
 
 class varEP(GPy.core.Model):
     """
-    Exaclty the same as varEP, but we use the marginal here, not the cavity. 
+    Exaclty the same as varEP, but we use the marginal here, not the cavity.
     """
     def __init__(self, X, tilted, kern=None):
         #accept the construction arguments

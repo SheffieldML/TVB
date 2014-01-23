@@ -1,12 +1,19 @@
+# Copyright (c) 2014, James Hensman
+# Distributed under the terms of the GNU General public License, see LICENSE.txt
+
 import numpy as np
 import pylab as pb
 import GPy
 from truncnorm import truncnorm
-from GPy.models.gradient_checker import GradientChecker
 from scipy.special import erf
 import tilted
 
 class classification(GPy.core.Model):
+    """
+
+    A first stab at a *sparse* classification method.
+
+    """
     def __init__(self, X, Y, Z=None, kern=None):
         self.X = X
         self.Y = Y
@@ -264,7 +271,6 @@ if __name__=='__main__':
     #m_.optimize()
     m = classification(X, Y, Z, m_.kern.copy())
     m.checkgrad(verbose=1)
-    stop
     m.constrain_positive('beta')
     m.constrain_fixed('(rbf|whi)')
     m.constrain_fixed('iip')

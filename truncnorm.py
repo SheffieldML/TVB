@@ -8,6 +8,11 @@ pb.ion()
 # pb.close('all')
 
 class truncnorm:
+    """
+    a class to explore the properties of the truncated normal distribution.
+
+    This isn;t actually used in the TVB algorithm in the end
+    """
     def __init__(self, mu, sigma2, side='left'):
         self.mu, self.sigma2, self.side  =  mu, sigma2, side
         self.sigma = np.sqrt(self.sigma2)

@@ -1,3 +1,7 @@
+# Copyright (c) 2014, James Hensman
+# Distributed under the terms of the GNU General public License, see LICENSE.txt
+
+
 import numpy as np
 import pylab as pb
 from scipy.special import erf
@@ -77,24 +81,23 @@ class Probit(Tilted):
     def __init__(self, Y):
         super(Probit, self).__init__(Y)
         self.Ysign = np.where(self.Y==1,1,-1)
-    
+
     def predict(self, mu, var):
         return 0.5*(1+erf(mu/np.sqrt(2.*(var+1))))
-        
+
     def set_cavity(self, mu, sigma2):
         Tilted.set_cavity(self, mu, sigma2)
-        
+
         sigma2p1 = 1 + self.sigma2
         da_dsigma2 = -.5*self.Ysign*self.mu*np.power(sigma2p1,-3./2)
-        
+
         self.a = self.Ysign*self.mu/(np.sqrt(sigma2p1))
-        
+
         self.Z = norm_cdf(self.a)
         self.N = norm_pdf(self.a)
         self.N_Z = self.N/self.Z
         self.N_Z2 = np.square(self.N_Z)
         self.N_Z3 = self.N_Z2*self.N_Z
-        
         self.mean = self.mu + self.Ysign*self.sigma2*self.N_Z/(np.sqrt(sigma2p1))
         self.var = self.sigma2*(1. - ((self.sigma2 * self.N_Z / sigma2p1) * (self.a + self.N_Z)))
 
@@ -103,13 +106,10 @@ class Probit(Tilted):
 
 
         self.dmean_dmu = (1 - self.sigma2/sigma2p1 * self.N_Z * (self.a + self.N_Z))
-        
         self.dN_Z_dsigma2 = -self.N_Z*da_dsigma2*(self.N_Z + self.a)
         dN_Z_dsigma2 = self.dN_Z_dsigma2
-        
         self.dmean_dsigma2 = self.Ysign*self.N_Z*(self.sigma2 + 2.)/2/np.power(sigma2p1, 1.5)\
                              + self.Ysign*self.sigma2/np.sqrt(sigma2p1)*self.dN_Z_dsigma2
-        
         self.dvar_dmu = -((self.Ysign/np.sqrt(sigma2p1)) * (np.square(self.sigma2)/sigma2p1) * self.N_Z
                           * (1 + (self.a + 2*self.N_Z) * (self.N_Z + self.a)))
 
@@ -129,7 +129,6 @@ if __name__=='__main__':
     probit = Probit(Y)
     mu = np.random.randn(N)
     sigma2 = np.random.rand(N)
-    
     #gradcheck for Z wrt mu
     def f(mu):
         probit.set_cavity(mu, sigma2)
@@ -179,7 +178,7 @@ if __name__=='__main__':
         return probit.dN_Z_dsigma2
     m = GradientChecker(f,df,np.random.rand(N))
     print 'N/Z wrt sigma2'
-    m.checkgrad(verbose=1)    
+    m.checkgrad(verbose=1)
 
     #gradcheck for mean wrt sigma2
     def f(sigma2):
@@ -188,7 +187,7 @@ if __name__=='__main__':
     def df(sigma2):
         probit.set_cavity(mu, sigma2)
         return probit.dmean_dsigma2
-    m = GradientChecker(f,df,np.random.rand(N))    
+    m = GradientChecker(f,df,np.random.rand(N))
     m.checkgrad(verbose=1)
 
     #gradcheck for var wrt sigma2

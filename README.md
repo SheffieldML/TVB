@@ -17,11 +17,11 @@ Our paper has been accepted for publication at AISTATS. Here's the citation-to-b
   year={2014}
 }
 
-DEPENDENCIES
-============
+Dependencies
+------------
 This code depends on our open source project GPy: github.com/SheffieldML/GPy
 
-LICENSE
-=======
+License
+-------
 The code is released under the GNU GPL (see LICENSE.txt). 
 

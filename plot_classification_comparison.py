@@ -38,26 +38,26 @@ def do_plots(i1, i2, lab1="", lab2=""):
     pb.subplots_adjust(bottom=0.2)
     pb.legend(loc=0)
 
-#do_plots(1,5, "varEP", "EP")
+#do_plots(1,5, "TVB", "EP")
 #pb.savefig('nlps.pdf')
 #
-#do_plots(7,3, "varEP (EP params)", "EP (varEP params)")
+#do_plots(7,3, "TVB (EP params)", "EP (TVB params)")
 #pb.savefig('cross_compare.pdf')
 #
-#do_plots(1,7, "varEP (varEP params)", "varEP (EP params)")
-#pb.savefig('varEP_param_compare.pdf')
+#do_plots(1,7, "TVB (TVB params)", "TVB (EP params)")
+#pb.savefig('TVB_param_compare.pdf')
 #
-#do_plots(0,4, "varEP", "EP")
+#do_plots(0,4, "TVB", "EP")
 #pb.title('hold out error')
 #pb.savefig('errors.pdf')
 
 def whiskers(i1, i2, lab1="", lab2=""):
     width = 0.35
-    l1 = pb.boxplot([d[:, i1] for d in data] , positions=np.arange(len(data))-1.03*width/2., widths=width) 
-    l2 = pb.boxplot([d[:, i2] for d in data] , positions=np.arange(len(data))+1.03*width/2., widths=width) 
+    l1 = pb.boxplot([d[:, i1] for d in data] , positions=np.arange(len(data))-1.03*width/2., widths=width)
+    l2 = pb.boxplot([d[:, i2] for d in data] , positions=np.arange(len(data))+1.03*width/2., widths=width)
     pb.xticks(np.arange(len(data)),[fn.split('raw')[0].replace('_',' ') for fn in fnames], rotation=45)
     pb.xlim(-1.2*width, len(data)-1+1.2*width)
-        
+
     for key, lines in l1.iteritems():
         pb.setp(lines, lw=1)
         if key == "boxes":
@@ -89,24 +89,24 @@ import matplotlib as mpl; mpl.rcParams['text.usetex'] = False
 pb.close('all')
 pb.figure('holdout', figsize=(8,3))
 pb.ylabel(u'Fraction error')
-whiskers(0,4, "varEP", "EP")
+whiskers(0,4, "TVB", "EP")
 pb.tight_layout()
-pb.savefig('/home/maxz/Documents/publications/varEP/aistats2014/classification_plots/holdout.pgf')
+pb.savefig('/home/maxz/Documents/publications/TVB/aistats2014/classification_plots/holdout.pgf')
 
 pb.close('all')
 pb.figure('crossparameters', figsize=(8,3))
 pb.ylabel(u'Fraction error')
-whiskers(6,2, "varEP", "EP")
+whiskers(6,2, "TVB", "EP")
 pb.tight_layout()
-pb.savefig('/home/maxz/Documents/publications/varEP/aistats2014/classification_plots/crossparams.pgf')
+pb.savefig('/home/maxz/Documents/publications/TVB/aistats2014/classification_plots/crossparams.pgf')
 
 pb.figure('negprob', figsize=(8,3))
-whiskers(1,5, "varEP", "EP")
+whiskers(1,5, "TVB", "EP")
 pb.ylabel(u'$-\log{p}(\mathbf{y}^{\star})$')
 pb.tight_layout()
-pb.savefig('/home/maxz/Documents/publications/varEP/aistats2014/classification_plots/negprob.pgf')
+pb.savefig('/home/maxz/Documents/publications/TVB/aistats2014/classification_plots/negprob.pgf')
 mpl.rcParams['text.usetex'] = True
-    
+
 
 
 

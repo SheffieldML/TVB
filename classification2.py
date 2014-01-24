@@ -8,16 +8,16 @@ import GPy
 from truncnorm import truncnorm
 from scipy.special import erf
 import tilted
-from varEP import varEP
-from varEP2 import varEP as varEP2
+from TVB import TVB
+from TVB2 import TVB as TVB2
 
-class classification(varEP2):
+class classification(TVB2):
     def __init__(self, X, Y, kern=None, link='probit'):
         self.Y = Y
         if link=='probit':
-            varEP2.__init__(self,X, tilted.Probit(Y.flatten()), kern)
+            TVB2.__init__(self,X, tilted.Probit(Y.flatten()), kern)
         elif link=='heaviside':
-            varEP2.__init__(self,X, tilted.Heaviside(Y.flatten()), kern)
+            TVB2.__init__(self,X, tilted.Heaviside(Y.flatten()), kern)
         else:
             raise ValueError('bad link name')
 

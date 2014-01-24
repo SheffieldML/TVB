@@ -76,7 +76,7 @@ def compare(Xtrain, Ytrain, Xtest, Ytest):
     EP_error = 1. - np.mean(truth==(predictions>0.5))
     EP_nlp = - np.mean(truth*np.log(predictions) + (1-truth)*np.log(1-predictions))
 
-    #now build varEP with the kern fixed to the EP solution
+    #now build TVB with the kern fixed to the EP solution
     k = m_ep2.kern.copy()
     k.constrain_fixed('')
     m2 = classification(Xtrain, Ytrain, k)

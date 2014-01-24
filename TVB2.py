@@ -8,9 +8,9 @@ from truncnorm import truncnorm
 from scipy.special import erf
 import tilted
 
-class varEP(GPy.core.Model):
+class TVB(GPy.core.Model):
     """
-    Exaclty the same as varEP, but we use the marginal here, not the cavity.
+    Exaclty the same as TVB, but we use the marginal here, not the cavity.
     """
     def __init__(self, X, tilted, kern=None):
         #accept the construction arguments

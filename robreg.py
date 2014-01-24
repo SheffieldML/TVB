@@ -3,16 +3,16 @@
 
 import numpy as np
 import GPy
-from varEP import varEP
+from TVB import TVB
 from quad_tilt import quad_tilt
 from functools import partial
 from integrate import integrate
 import pylab as pb
 
-class robreg(varEP):
+class robreg(TVB):
     def __init__(self, X, Y, kern=None, in_parallel=False):
         self.Y = Y
-        varEP.__init__(self, X, quad_tilt(Y.flatten(), in_parallel=in_parallel) , kern)
+        TVB.__init__(self, X, quad_tilt(Y.flatten(), in_parallel=in_parallel) , kern)
 
     def predict(self, Xnew):
         mu, var = self._predict_raw(Xnew)
